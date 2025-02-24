@@ -8,12 +8,10 @@ contract SimpleVaultBase {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.UintSet;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     uint256 public constant Precision = 10 ** 18;
 
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "Only admin");
+    modifier onlyManager() {
+        require(msg.sender == cedefiManager, "Only cedefi manager");
         _;
     }
 
@@ -37,7 +35,7 @@ contract SimpleVaultBase {
     }
 
     /** basic information */
-    address public admin; // admin address, this is creater address of CeDeFi Layer.
+    address public cedefiManager; // admin address, this is creater address of CeDeFi Layer.
     address public underlying; // underlying asset
     YieldType internal yieldType; // yield type
 

@@ -9,7 +9,7 @@ import { preDeploy } from "./common";
 const Precesion = ethers.parseEther("1");
 
 describe("CeDeFiManager", function () {
-  it("create Vault", async function () {
+it("create Vault", async function () {
     const {admin, CeDeFiManager, BBTC, player1, portfolio1, portfolio2, portfolio3} = await loadFixture(preDeploy);
 
     const minDepositAmount = ethers.parseEther("1");

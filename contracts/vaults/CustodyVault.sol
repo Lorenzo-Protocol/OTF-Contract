@@ -32,14 +32,14 @@ contract CustodyVault is
         __UUPSUpgradeable_init();
         __ERC20_init(name_, symbol_);
 
-        admin = msg.sender;
+        cedefiManager = msg.sender;
         underlying = underlying_;
         settlementPeriod = 1;
 
         updatePortfolios(portfolios_, weights_);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
 
     // to handle the depoisted underlying asset
     function onDepositUnderlying(address from, uint256 underlyingAmount)

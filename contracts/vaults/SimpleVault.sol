@@ -36,7 +36,7 @@ abstract contract SimpleVault is
     //    implement by different way for different yield type vault
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
 
-    function updatePortfolios(address[] calldata portfolios_, uint256[] calldata weights_) public onlyAdmin {
+    function updatePortfolios(address[] calldata portfolios_, uint256[] calldata weights_) public onlyManager {
         uint256 totalWeight;
         uint256 len = portfolios_.length;
         for (uint256 i = 0; i < len; ) {
@@ -53,7 +53,7 @@ abstract contract SimpleVault is
     }
 
     // @dev to set the unit NAV of the current period
-    function setUnitNav(uint256 unitNav) external onlyAdmin {
+    function setUnitNav(uint256 unitNav) external onlyManager {
         uint128 index = settlementPeriod;
         periodUnitNav[index] = unitNav;
         unsettledWithdrawShares += periodWithdrawShares[index];
@@ -64,7 +64,7 @@ abstract contract SimpleVault is
     }
 
     // @dev set min deposit amount
-    function setMinDepositAmount(uint256 amount) external onlyAdmin {
+    function setMinDepositAmount(uint256 amount) external onlyManager {
         require(amount > 0, "invalid amount");
         minDepositAmount = amount;
 
@@ -72,7 +72,7 @@ abstract contract SimpleVault is
     }
 
     // @dev set min withdraw amount
-    function setMinWithdrawAmount(uint256 amount) external onlyAdmin {
+    function setMinWithdrawAmount(uint256 amount) external onlyManager {
         require(amount > 0, "invalid amount");
         minWithdrawAmount = amount;
 
@@ -80,7 +80,7 @@ abstract contract SimpleVault is
     }
 
     // @dev add blacklisted user
-    function addBlacklist(address[] calldata users) external onlyAdmin {
+    function addBlacklist(address[] calldata users) external onlyManager {
         uint256 len = users.length;
         for (uint256 i = 0; i < len; ) {
             blacklisted[users[i]] = true;
@@ -91,7 +91,7 @@ abstract contract SimpleVault is
     }
 
     // @dev remove blacklisted user
-    function removeBlacklist(address[] calldata users) external onlyAdmin {
+    function removeBlacklist(address[] calldata users) external onlyManager {
         uint256 len = users.length;
         for (uint256 i = 0; i < len; ) {
             delete blacklisted[users[i]];
@@ -102,7 +102,7 @@ abstract contract SimpleVault is
     }
 
     // @dev freeze the shares of the target address
-    function freezeShares(address account, uint256 shares) external onlyAdmin {
+    function freezeShares(address account, uint256 shares) external onlyManager {
         uint256 leftShares = balanceOf(account);
         if (shares > leftShares) {
             shares = leftShares;
@@ -113,7 +113,7 @@ abstract contract SimpleVault is
     }
 
     // @dev unfreeze the shares of the target address
-    function unfreezeShares(address account, uint256 shares) external onlyAdmin {
+    function unfreezeShares(address account, uint256 shares) external onlyManager {
         uint256 freezed = freezedShares[account];
         if (shares > freezed) {
             shares = freezed;
@@ -124,12 +124,12 @@ abstract contract SimpleVault is
     }
 
     // @dev to pause the vault
-    function pause() external onlyAdmin {
+    function pause() external onlyManager {
         _pause();
     }
 
     // @dev to unpause the vault
-    function unpause() external onlyAdmin {
+    function unpause() external onlyManager {
         _unpause();
     }
 
