@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.20;
+
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {YieldType} from "../intf/IVault.sol";
+
+contract SimpleVaultBase {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
+
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    uint256 public constant Precision = 10 ** 18;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin");
+        _;
+    }
+
+    modifier lock() {
+        require(!_locked, "Locked");
+        _locked = true;
+        _;
+        _locked = false;
+    }
+
+    modifier notBlacklisted() {
+        require(!blacklisted[msg.sender], "Blacklisted");
+        _;
+    }
+
+    struct WithdrewRequest {
+        uint256 requestShares; // requested shares
+        uint128 targetPeriod;  // in which period this withdraw request can be executed;
+        uint64  requestTimestamp;      // timestamp of this request, if request many times, only the latest one is recorded
+        uint64  executedTimestamp;     // timestamp of this request is executed
+    }
+
+    /** basic information */
+    address public admin; // admin address, this is creater address of CeDeFi Layer.
+    address public underlying; // underlying asset
+    YieldType internal yieldType; // yield type
+
+    /**   Manage information */
+    bool private _locked; // locked entrance
+    mapping(address => bool) public blacklisted; // blacklisted users
+    mapping(address => uint256) public freezedShares;   // freezed shares
+    uint256 public minDepositAmount; // minimum deposit amount
+    uint256 public minWithdrawAmount; // maximum withdraw amount
+
+    EnumerableSet.AddressSet internal _portfolios;          // current portfolios
+    mapping(address => uint256) public portfolioWeights;    // portfolio -> weight
+
+    uint128 public settlementPeriod; // current settlement period
+    mapping(uint128 settlementPeriod => uint256) public periodUnitNav; // settlement period -> unit NAV of each period
+    mapping(uint128 settlementPeriod => uint256) public periodWithdrawShares; // settlement period -> total shares  of each period
+    uint256 public unsettledWithdrawShares; // total unsettled withdraw shares, someone may request withdraw, but not executed yet
+
+    mapping(address => EnumerableSet.UintSet) internal _withdrawRequestIds; // withdraw request ids
+    mapping(address user => mapping(uint128 settlementPeriod => WithdrewRequest)) public withdrewRequests; // user -> settlementPeriod -> withdrew request
+
+
+}
