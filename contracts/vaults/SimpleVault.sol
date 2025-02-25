@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IVault, YieldType} from "../intf/IVault.sol";
 import {SimpleVaultBase} from "./SimpleVaultBase.sol";
@@ -53,8 +54,18 @@ abstract contract SimpleVault is
     }
 
     // @dev to set the unit NAV of the current period
+    // while the unit nav settled, all these withdraw reqeusts are settled,
+    // then no matter they finish or not finish the withdraw,
+    // all the requested shares stop yielding,
+    // and the totalSupply() MUST substract these shares.
+    //
+    // CAUTION: for the same period, this method can only be called once
     function setUnitNav(uint256 unitNav) external onlyManager {
         uint128 index = settlementPeriod;
+        require(periodUnitNav[index] == 0, "period settled already");
+        // FIXME: should do this check??????
+        require(unitNav != 0, "invalid unit nav");
+
         periodUnitNav[index] = unitNav;
         unsettledWithdrawShares += periodWithdrawShares[index];
 
@@ -145,15 +156,14 @@ abstract contract SimpleVault is
     }
 
     // @dev transfer shares token to the target address, should check the freezed shares
-    function transfer(address recipient, uint256 amount)
+    function transfer(address, uint256 )
         public
         override(IERC20, ERC20Upgradeable)
-        whenNotPaused
-        notBlacklisted
         returns (bool)
     {
-        require(getUsableShares(msg.sender) >= amount, "Insufficient balance");
-        return super.transfer(recipient, amount);
+        revert("transfer not allowed");
+        // require(getUsableShares(msg.sender) >= amount, "Insufficient balance");
+        // return super.transfer(recipient, amount);
     }
 
     // @dev get usable shares of the target address
@@ -161,13 +171,14 @@ abstract contract SimpleVault is
         uint256 rawBalance = balanceOf(account);
         uint256 freezed = freezedShares[account];
         uint256 ongoingWithdrawShares = getOngoingWithdrawShares(account);
-
+        // it must be but just check it
         return rawBalance > (freezed + ongoingWithdrawShares) ?
                rawBalance - freezed - ongoingWithdrawShares :
                0;
     }
 
-    // @dev to calculate all the ongoing withdraw amount
+    // @dev to calculate all the ongoing withdraw amount,
+    // include those settled but not finished withdraw requests
     function getOngoingWithdrawShares(address account) public view returns(uint256) {
         uint256 len = _withdrawRequestIds[account].length();
         uint256 shares;
@@ -190,7 +201,7 @@ abstract contract SimpleVault is
         require(underlyingAmount >= minDepositAmount, "deposit amount too small");
 
         onDepositUnderlying(msg.sender, underlyingAmount);
-        uint256 sharesAmount = mintShares(msg.sender, underlyingAmount);
+        (uint256 sharesAmount, uint256 unitNav) = mintShares(msg.sender, underlyingAmount);
 
         // emit enough information for accounting
         address[] memory p = portfolios();
@@ -199,7 +210,7 @@ abstract contract SimpleVault is
             msg.sender,
             underlyingAmount,
             sharesAmount,
-            periodUnitNav[settlementPeriod],
+            unitNav,
             settlementPeriod,
             p,
             w,
@@ -230,7 +241,7 @@ abstract contract SimpleVault is
         request.targetPeriod = requestId;
         request.requestTimestamp = uint64(block.timestamp);
         // to record the total withdraw shares of this period, and sub it while this period is settled
-        // so these shares stop yield
+        // so these shares stop yielding
         periodWithdrawShares[requestId] += shareAmount;
 
         emit WithdrawRequested(
@@ -280,18 +291,12 @@ abstract contract SimpleVault is
     // @dev mint shares to the target address, it should be calculated as : shares = amount / unitNav
     // @param to the target address
     // @param underlyingAmount the amount of underlying asset
-    function mintShares(address to, uint256 underlyingAmount) internal returns(uint256) {
-        uint256 shares;
-        if (settlementPeriod == 1) {
-            shares = underlyingAmount;
-        } else {
-            uint256 unitNav = periodUnitNav[settlementPeriod];
-            require(unitNav > 0, "oops: unit nav");
-            shares = (underlyingAmount * Precision) / unitNav;
-        }
-        _mint(to, shares);
+    function mintShares(address to, uint256 underlyingAmount) internal returns(uint256 sharesAmount, uint256 unitNav) {
+        unitNav = getCurrentUnitNav();
+        require(unitNav > 0, "oops: zero unit nav");
+        sharesAmount = (underlyingAmount * Precision) / unitNav;
 
-        return shares;
+        _mint(to, sharesAmount);
     }
 
     // @dev burn shares from the target address, it should be calculated as : amount = shares * unitNav
@@ -304,15 +309,15 @@ abstract contract SimpleVault is
         _burn(from, sharesAmount);
         return amount;
     }
-
+    // @dev get the yield type of the vault
     function getYieldType() public view override returns (YieldType) {
         return yieldType;
     }
-
-     function portfolios() public view returns (address[] memory) {
+    // @dev get portfolios list
+    function portfolios() public view returns (address[] memory) {
         return EnumerableSet.values(_portfolios);
     }
-
+    // @dev get weights of the portfolios
     function weights() public view returns (uint256[] memory) {
         uint256 len = _portfolios.length();
         uint256[] memory result = new uint256[](len);
@@ -321,5 +326,14 @@ abstract contract SimpleVault is
             unchecked { i++; }
         }
         return result;
+    }
+    // @dev get current unit nav
+    function getCurrentUnitNav() public view returns (uint256) {
+        if (settlementPeriod == 1) {
+            IERC20Metadata underlyingToken = IERC20Metadata(underlying);
+            return 10 ** underlyingToken.decimals();
+        } else {
+            return periodUnitNav[settlementPeriod - 1];
+        }
     }
 }

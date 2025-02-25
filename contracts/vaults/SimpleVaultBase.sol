@@ -34,10 +34,11 @@ contract SimpleVaultBase {
         uint64  executedTimestamp;     // timestamp of this request is executed
     }
 
+    YieldType internal immutable yieldType; // yield type
+
     /** basic information */
     address public cedefiManager; // admin address, this is creater address of CeDeFi Layer.
     address public underlying; // underlying asset
-    YieldType internal yieldType; // yield type
 
     /**   Manage information */
     bool private _locked; // locked entrance
