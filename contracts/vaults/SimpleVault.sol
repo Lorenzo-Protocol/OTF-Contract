@@ -166,6 +166,18 @@ abstract contract SimpleVault is
         // return super.transfer(recipient, amount);
     }
 
+    // @dev ban transferFrom
+    //  not allowed approve someone else to transfer shares
+    function transferFrom(address, address, uint256)
+        public
+        override(IERC20, ERC20Upgradeable)
+        returns (bool)
+    {
+        revert("transferFrom not allowed");
+        // require(getUsableShares(sender) >= amount, "Insufficient balance");
+        // return super.transferFrom(sender, recipient, amount);
+    }
+
     // @dev get usable shares of the target address
     function getUsableShares(address account) public view returns(uint256) {
         uint256 rawBalance = balanceOf(account);
