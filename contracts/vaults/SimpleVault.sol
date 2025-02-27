@@ -29,6 +29,7 @@ abstract contract SimpleVault is
     event SetMinDepositAmount(uint256 amount);
     event SetMinWithdrawAmount(uint256 amount);
     event UpdatePortfolios(address[] portfolios, uint256[] weights);
+    event SetTransferable(bool transferable);
 
     // @dev while users deposit underlying asset, how to allocate the asset to different portfolios,
     //  for different yield type vault, it should be implemented by different way
@@ -144,6 +145,13 @@ abstract contract SimpleVault is
         _unpause();
     }
 
+    // @dev set the shares transferable or not
+    function setTransferable(bool transferable_) external onlyManager {
+        require(transferable != transferable_, "same transferable");
+        transferable = transferable_;
+        emit SetTransferable(transferable_);
+    }
+
     // @dev total supply of shares, it should substract the withdrew shares of unsettled withdraw requests
     function totalSupply()
         public
@@ -156,26 +164,30 @@ abstract contract SimpleVault is
     }
 
     // @dev transfer shares token to the target address, should check the freezed shares
-    function transfer(address, uint256 )
+    function transfer(address recipient, uint256 amount)
         public
         override(IERC20, ERC20Upgradeable)
+        whenNotPaused
+        notBlacklisted
         returns (bool)
     {
-        revert("transfer not allowed");
-        // require(getUsableShares(msg.sender) >= amount, "Insufficient balance");
-        // return super.transfer(recipient, amount);
+        require(transferable, "Not transferable");
+        require(getUsableShares(msg.sender) >= amount, "Insufficient balance");
+        return super.transfer(recipient, amount);
     }
 
     // @dev ban transferFrom
     //  not allowed approve someone else to transfer shares
-    function transferFrom(address, address, uint256)
+    function transferFrom(address from, address to, uint256 value)
         public
         override(IERC20, ERC20Upgradeable)
+        whenNotPaused
+        notBlacklisted
         returns (bool)
     {
-        revert("transferFrom not allowed");
-        // require(getUsableShares(sender) >= amount, "Insufficient balance");
-        // return super.transferFrom(sender, recipient, amount);
+        require(transferable, "Not transferable");
+        require(getUsableShares(from) >= value, "Insufficient balance");
+        return super.transferFrom(from, to, value);
     }
 
     // @dev get usable shares of the target address

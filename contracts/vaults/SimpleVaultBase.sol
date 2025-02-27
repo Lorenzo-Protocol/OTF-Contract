@@ -42,6 +42,7 @@ contract SimpleVaultBase {
 
     /**   Manage information */
     bool private _locked; // locked entrance
+    bool public transferable; // the shares are transferable or not
     mapping(address => bool) public blacklisted; // blacklisted users
     mapping(address => uint256) public freezedShares;   // freezed shares
     uint256 public minDepositAmount; // minimum deposit amount
@@ -57,6 +58,5 @@ contract SimpleVaultBase {
 
     mapping(address => EnumerableSet.UintSet) internal _withdrawRequestIds; // withdraw request ids
     mapping(address user => mapping(uint128 settlementPeriod => WithdrewRequest)) public withdrewRequests; // user -> settlementPeriod -> withdrew request
-
 
 }
