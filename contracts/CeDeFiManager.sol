@@ -7,7 +7,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {IVault, YieldType} from "./intf/IVault.sol";
-import {CustodyVault} from "./vaults/CustodyVault.sol";
+import {SimpleVault} from "./vaults/SimpleVault.sol";
 import {CeDeFiManagerBase} from "./CeDeFiManagerBase.sol";
 
 import "hardhat/console.sol";
@@ -68,7 +68,7 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
     }
 
     // @dev to create a custody vault
-    function createCustodyVault(
+    function createSimpleVault(
         string memory name,
         string memory symbol,
         address underlying,
@@ -92,7 +92,7 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
             name, symbol, underlying, portfolios, portfolioWeights
         );
 
-        CustodyVault vault = new CustodyVault();
+        SimpleVault vault = new SimpleVault();
         bytes32 salt = keccak256(abi.encodePacked(YieldType.Custody, name, symbol, underlying));
         address vaultProxy = address(new ERC1967Proxy{salt: salt}(address(vault), data));
         require(_vaults.contains(vaultProxy) == false, "CeDeFiManager: vault already exists");
@@ -119,7 +119,7 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
     ) public onlyRole(ADMIN_ROLE) {
         // create new vault
         if (yieldType == YieldType.Custody) {
-           createCustodyVault(name, symbol, underlying, portfolios, portfolioWeights, minDepositAmount, minWithdrawAmount);
+           createSimpleVault(name, symbol, underlying, portfolios, portfolioWeights, minDepositAmount, minWithdrawAmount);
         } else if (yieldType == YieldType.PrimeWallet) {
             // create prime wallet vault
         } else if (yieldType == YieldType.DefiProtocol) {

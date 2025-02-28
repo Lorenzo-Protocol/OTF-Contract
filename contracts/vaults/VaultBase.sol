@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {YieldType} from "../intf/IVault.sol";
 
-contract SimpleVaultBase {
+contract VaultBase {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.UintSet;
 
-    uint256 public constant Precision = 10 ** 18;
+    uint256 public constant Precision = 10 ** 18; // the precision is the same as decimals
 
     modifier onlyManager() {
         require(msg.sender == cedefiManager, "Only cedefi manager");

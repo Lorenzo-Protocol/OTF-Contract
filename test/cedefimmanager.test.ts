@@ -34,7 +34,7 @@ it("create Vault", async function () {
     await BBTC.mint(player1.address, ethers.parseEther("1000"));
 
     const vaultAddress= await CeDeFiManager.getVault(0);
-    const finBTCVault = await ethers.getContractAt("CustodyVault", vaultAddress);
+    const finBTCVault = await ethers.getContractAt("SimpleVault", vaultAddress);
     await BBTC.connect(player1).approve(finBTCVault.target, ethers.parseEther("1000"));
 
     const depositAmount = ethers.parseEther("100");
