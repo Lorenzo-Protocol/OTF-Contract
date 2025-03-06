@@ -9,8 +9,74 @@ import { preDeploy } from "./common";
 const Precesion = ethers.parseEther("1");
 
 describe("CeDeFiManager", function () {
+let AllContracts: any;
+
+this.beforeEach(async function () {
+  AllContracts= await loadFixture(preDeploy);
+
+  const {player1, player2, player3, CeDeFiManager, BBTC, portfolio1, portfolio2, portfolio3} = AllContracts;
+
+  const player1BtcBalance = await BBTC.balanceOf(player1.address);
+  const player2BtcBalance = await BBTC.balanceOf(player2.address);
+  const player3BtcBalance = await BBTC.balanceOf(player3.address);
+  const portfolio1BtcBalance = await BBTC.balanceOf(portfolio1.address);
+  const portfolio2BtcBalance = await BBTC.balanceOf(portfolio2.address);
+  const portfolio3BtcBalance = await BBTC.balanceOf(portfolio3.address);
+
+  let totalBtcBalance = player1BtcBalance + player2BtcBalance + player3BtcBalance + portfolio1BtcBalance + portfolio2BtcBalance + portfolio3BtcBalance;
+  const totalVaultsCount = await CeDeFiManager.getVaultsLength();
+  for (let i = 0; i < totalVaultsCount; i++) {
+    const vaultAddress = await CeDeFiManager.getVault(i);
+    const vaultBtcBalance = await BBTC.balanceOf(vaultAddress);
+    totalBtcBalance += vaultBtcBalance;
+
+    const vault = await ethers.getContractAt("SimpleVault", vaultAddress);
+    const player1Shares = await vault.balanceOf(player1.address);
+    const player2Shares = await vault.balanceOf(player2.address);
+    const player3Shares = await vault.balanceOf(player3.address);
+
+    const totalShares = player1Shares + player2Shares + player3Shares;
+    const totalSharesMinted = await vault.totalSupply();
+    expect(totalShares).to.equal(totalSharesMinted);
+  }
+
+  const BtcTotalSupply = await BBTC.totalSupply();
+  expect(totalBtcBalance).to.equal(BtcTotalSupply);
+});
+
+this.afterEach(async function () {
+  const {player1, player2, player3, CeDeFiManager, BBTC, portfolio1, portfolio2, portfolio3} = AllContracts;
+
+  const player1BtcBalance = await BBTC.balanceOf(player1.address);
+  const player2BtcBalance = await BBTC.balanceOf(player2.address);
+  const player3BtcBalance = await BBTC.balanceOf(player3.address);
+  const portfolio1BtcBalance = await BBTC.balanceOf(portfolio1.address);
+  const portfolio2BtcBalance = await BBTC.balanceOf(portfolio2.address);
+  const portfolio3BtcBalance = await BBTC.balanceOf(portfolio3.address);
+
+  let totalBtcBalance = player1BtcBalance + player2BtcBalance + player3BtcBalance + portfolio1BtcBalance + portfolio2BtcBalance + portfolio3BtcBalance;
+  const totalVaultsCount = await CeDeFiManager.getVaultsLength();
+  for (let i = 0; i < totalVaultsCount; i++) {
+    const vaultAddress = await CeDeFiManager.getVault(i);
+    const vaultBtcBalance = await BBTC.balanceOf(vaultAddress);
+    totalBtcBalance += vaultBtcBalance;
+
+    const vault = await ethers.getContractAt("SimpleVault", vaultAddress);
+    const player1Shares = await vault.balanceOf(player1.address);
+    const player2Shares = await vault.balanceOf(player2.address);
+    const player3Shares = await vault.balanceOf(player3.address);
+
+    const totalShares = player1Shares + player2Shares + player3Shares;
+    const totalSharesMinted = await vault.totalSupply();
+    expect(totalShares).to.equal(totalSharesMinted);
+  }
+
+  const BtcTotalSupply = await BBTC.totalSupply();
+  expect(totalBtcBalance).to.equal(BtcTotalSupply);
+});
+
 it("create Vault", async function () {
-    const {admin, CeDeFiManager, BBTC, player1, portfolio1, portfolio2, portfolio3} = await loadFixture(preDeploy);
+    const {admin, CeDeFiManager, BBTC, player1, portfolio1, portfolio2, portfolio3} = AllContracts;
 
     const minDepositAmount = ethers.parseEther("1");
     const minWithdrawAmount = ethers.parseEther("0.5");
