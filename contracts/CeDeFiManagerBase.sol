@@ -16,4 +16,5 @@ contract CeDeFiManagerBase {
 
     EnumerableSet.AddressSet internal _activePortfolios;
     EnumerableSet.AddressSet internal _vaults;
+    mapping(bytes4 => bool) public allowedVaultsFuncs;
 }

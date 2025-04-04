@@ -186,6 +186,7 @@ abstract contract Vault is
         returns (bool)
     {
         require(transferable, "Not transferable");
+        require(!blacklisted[from], "from is blacklisted");
         require(getUsableShares(from) >= value, "Insufficient balance");
         return super.transferFrom(from, to, value);
     }

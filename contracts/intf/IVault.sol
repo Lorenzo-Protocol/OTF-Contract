@@ -43,10 +43,18 @@ interface IVault is IERC20 {
     function deposit(uint256 amount) external;
     function requestWithdraw(uint256 amount) external returns(uint128 reqeustId);
     function withdraw(uint128 requestId) external;
-    function updatePortfolios(address[] calldata portfolios, uint256[] calldata weights) external;
     function getYieldType() external view returns (YieldType);
 
     // manager functions
+    function updatePortfolios(address[] calldata portfolios, uint256[] calldata weights) external;
     function setMinDepositAmount(uint256 amount) external;
     function setMinWithdrawAmount(uint256 amount) external;
+    function setUnitNav(uint256 unitNav) external;
+    function addBlacklist(address[] calldata users) external;
+    function removeBlacklist(address[] calldata users) external;
+    function freezeShares(address account, uint256 shares) external;
+    function unfreezeShares(address account, uint256 shares) external;
+    function setTransferable(bool transferable_) external;
+    function pause() external;
+    function unpause() external;
 }

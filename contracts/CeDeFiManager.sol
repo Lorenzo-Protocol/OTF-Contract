@@ -60,9 +60,26 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
         emit DeletePortfolios(portfolios);
     }
 
+    // @dev add allowed vaults functions
+    function addAllowedVaultsFuncs(bytes4[] memory funcSelectors, bool[] memory isAllowed) public onlyRole(ADMIN_ROLE) {
+        require(funcSelectors.length == isAllowed.length, "CeDeFiManager: mismatched length");
+
+        uint256 len = funcSelectors.length;
+        for (uint256 i; i < len; ) {
+            allowedVaultsFuncs[funcSelectors[i]] = isAllowed[i];
+            unchecked { ++i; }
+        }
+    }
+
     // @dev manage the vaults
     function executeCommand(address vault, bytes memory data) public onlyRole(OPERATOR_ROLE) {
         require(_vaults.contains(vault), "CeDeFiManager: vault not exist");
+        bytes4 selector;
+        assembly {
+            selector := mload(add(data, 32))
+        }
+        require(allowedVaultsFuncs[selector], "CeDeFiManager: vault function not allowed");
+
         (bool success, bytes memory returndata) = vault.call(data);
         require(success, string(returndata));
     }
