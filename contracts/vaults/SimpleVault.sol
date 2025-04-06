@@ -26,7 +26,8 @@ contract SimpleVault is
         string calldata symbol_,
         address underlying_,
         address[] calldata portfolios_,
-        uint256[] calldata weights_
+        uint256[] calldata weights_,
+        address cedefiManager_
     ) public initializer {
         require(underlying_ != address(0), "Invalid underlying");
         require(portfolios_.length == weights_.length, "Invalid portfolios or weights");
@@ -34,7 +35,7 @@ contract SimpleVault is
         __UUPSUpgradeable_init();
         __ERC20_init(name_, symbol_);
 
-        cedefiManager = msg.sender;
+        cedefiManager = cedefiManager_;
         underlying = underlying_;
         settlementPeriod = 1;
 

@@ -21,6 +21,5 @@ export async function preDeploy() {
 
   const CeDeFiManager = await ethers.getContractAt('CeDeFiManager', ManagerProxy.target);
 
-
   return {boss, admin, operator, player1, player2, player3, CeDeFiManager, BBTC, portfolio1, portfolio2, portfolio3};
 }

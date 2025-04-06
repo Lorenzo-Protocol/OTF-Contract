@@ -7,7 +7,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {IVault, YieldType} from "./intf/IVault.sol";
-import {SimpleVault} from "./vaults/SimpleVault.sol";
 import {CeDeFiManagerBase} from "./CeDeFiManagerBase.sol";
 
 import "hardhat/console.sol";
@@ -86,62 +85,60 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
 
     // @dev to create a custody vault
     function createSimpleVault(
-        string memory name,
-        string memory symbol,
-        address underlying,
-        address[] memory portfolios,
-        uint256[] memory portfolioWeights,
-        uint256 minDepositAmount,
-        uint256 minWithdrawAmount
+        CreateVaultParams memory params,
+        address implementation
     )
         internal
     {
-
-        require(portfolios.length == portfolioWeights.length, "CeDeFiManager: invalid length portfolios and weights");
-        uint len = portfolios.length;
+        require(params.portfolios.length == params.portfolioWeights.length, "CeDeFiManager: invalid length portfolios and weights");
+        uint len = params.portfolios.length;
         for (uint i = 0; i < len; ) {
-            require(_activePortfolios.contains(portfolios[i]), "CeDeFiManager: portfolio not exists");
+            require(_activePortfolios.contains(params.portfolios[i]), "CeDeFiManager: portfolio not exists");
             unchecked { ++i; }
         }
 
         bytes memory data = abi.encodeWithSignature(
-            "initialize(string,string,address,address[],uint256[])",
-            name, symbol, underlying, portfolios, portfolioWeights
+            "initialize(string,string,address,address[],uint256[],address)",
+            params.name, params.symbol, params.underlying, params.portfolios, params.portfolioWeights, address(this)
         );
 
-        SimpleVault vault = new SimpleVault();
-        bytes32 salt = keccak256(abi.encodePacked(YieldType.Custody, name, symbol, underlying));
-        address vaultProxy = address(new ERC1967Proxy{salt: salt}(address(vault), data));
+        bytes32 salt = keccak256(abi.encodePacked(params.yieldType, params.name, params.symbol, params.underlying));
+        address vaultProxy = address(new ERC1967Proxy{salt: salt}(implementation, data));
         require(_vaults.contains(vaultProxy) == false, "CeDeFiManager: vault already exists");
+        require(IVault(vaultProxy).getYieldType() == params.yieldType, "CeDeFiManager: vault yield type mismatch");
 
         _vaults.add(vaultProxy);
 
-        IVault(vaultProxy).setMinDepositAmount(minDepositAmount);
-        IVault(vaultProxy).setMinWithdrawAmount(minWithdrawAmount);
+        IVault(vaultProxy).setMinDepositAmount(params.minDepositAmount);
+        IVault(vaultProxy).setMinWithdrawAmount(params.minWithdrawAmount);
 
-        emit CreateVault(vaultProxy, uint256(YieldType.Custody), name, symbol, underlying);
+        emit CreateVault(vaultProxy, params.yieldType, params.name, params.symbol, params.underlying);
     }
 
     // @dev create a new vault
     //    the yield type, name, symbol and underlying can only be added once
+    struct CreateVaultParams {
+        YieldType yieldType;
+        string name;
+        string symbol;
+        address underlying;
+        uint256 minDepositAmount;
+        uint256 minWithdrawAmount;
+        address[] portfolios;
+        uint256[] portfolioWeights;
+    }
     function createVault(
-        YieldType yieldType,
-        string memory name,
-        string memory symbol,
-        address underlying,
-        uint256 minDepositAmount,
-        uint256 minWithdrawAmount,
-        address[] memory portfolios,
-        uint256[] memory portfolioWeights
+        CreateVaultParams memory params,
+        address implementation
     ) public onlyRole(ADMIN_ROLE) {
         // create new vault
-        if (yieldType == YieldType.Custody) {
-           createSimpleVault(name, symbol, underlying, portfolios, portfolioWeights, minDepositAmount, minWithdrawAmount);
-        } else if (yieldType == YieldType.PrimeWallet) {
+        if (params.yieldType == YieldType.Custody) {
+           createSimpleVault(params, implementation);
+        } else if (params.yieldType == YieldType.PrimeWallet) {
             // create prime wallet vault
-        } else if (yieldType == YieldType.DefiProtocol) {
+        } else if (params.yieldType == YieldType.DefiProtocol) {
             // create defi protocol vault
-        } else if (yieldType == YieldType.FromFund) {
+        } else if (params.yieldType == YieldType.FromFund) {
             // create centralized fund vault
         } else {
             revert("CeDeFiManager: invalid yield type");

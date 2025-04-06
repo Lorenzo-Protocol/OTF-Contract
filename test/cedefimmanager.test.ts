@@ -85,17 +85,36 @@ it("create Vault", async function () {
     const pp3 = ethers.parseEther("0.5");
 
     await CeDeFiManager.connect(admin).addPortfolios([portfolio1.address, portfolio2.address, portfolio3.address]);
+    const implementation = await ethers.deployContract("SimpleVault");
+    await implementation.waitForDeployment();
 
     await CeDeFiManager.connect(admin).createVault(
-      1,  // yield type 1
-      "Fin BTC",
-      "finBTC",
-      BBTC.target,
-      minDepositAmount,
-      minWithdrawAmount,
-      [portfolio1.address, portfolio2.address, portfolio3.address],
-      [pp1, pp2, pp3]
+      {
+        yieldType: 1,  // yield type 1
+        name: "Fin BTC",
+        symbol: "finBTC",
+        underlying: BBTC.target,
+        minDepositAmount,
+        minWithdrawAmount,
+        portfolios: [portfolio1.address, portfolio2.address, portfolio3.address],
+        portfolioWeights: [pp1, pp2, pp3]
+      },
+      implementation.target
     );
+    // add support functions
+    await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
+      implementation.interface.getFunction('updatePortfolios').selector,
+      implementation.interface.getFunction('setMinDepositAmount').selector,
+      implementation.interface.getFunction('setMinWithdrawAmount').selector,
+      implementation.interface.getFunction('setUnitNav').selector,
+      implementation.interface.getFunction('addBlacklist').selector,
+      implementation.interface.getFunction('removeBlacklist').selector,
+      implementation.interface.getFunction('freezeShares').selector,
+      implementation.interface.getFunction('unfreezeShares').selector,
+      implementation.interface.getFunction('setTransferable').selector,
+      implementation.interface.getFunction('pause').selector,
+      implementation.interface.getFunction('unpause').selector,
+    ], [true, true, true, true, true, true, true, true, true, true, true]);
 
     await BBTC.mint(player1.address, ethers.parseEther("1000"));
 
