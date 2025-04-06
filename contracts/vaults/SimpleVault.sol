@@ -55,14 +55,19 @@ contract SimpleVault is
 
         address[] memory portfolios = _portfolios.values();
         uint256 len = portfolios.length;
-        for (uint256 i = 0; i < len;) {
+        uint256 totalTransferred;
+        for (uint256 i; i < len;) {
             address portfolio = portfolios[i];
             uint256 weight = portfolioWeights[portfolio];
             uint256 splitUnderlying = (underlyingAmount * weight) / Precision;
 
             SafeERC20.safeTransfer(underlyingToken, portfolio, splitUnderlying);
-
+            totalTransferred += splitUnderlying;
             unchecked { i++; }
+        }
+
+        if (totalTransferred < underlyingAmount) {
+            SafeERC20.safeTransfer(underlyingToken, portfolios[0], underlyingAmount - totalTransferred);
         }
     }
     // to handle the withdrawed underlying asset
