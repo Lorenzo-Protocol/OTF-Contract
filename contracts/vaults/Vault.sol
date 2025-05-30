@@ -17,6 +17,8 @@ abstract contract Vault is
     VaultBase,
     IVault
 {
+    address public constant NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -222,6 +224,7 @@ abstract contract Vault is
         whenNotPaused
         notBlacklisted
         lock
+        payable
     {
         require(underlyingAmount >= minDepositAmount, "deposit amount too small");
 
@@ -355,8 +358,12 @@ abstract contract Vault is
     // @dev get current unit nav
     function getCurrentUnitNav() public view returns (uint256) {
         if (settlementPeriod == 1) {
-            IERC20Metadata underlyingToken = IERC20Metadata(underlying);
-            return 10 ** underlyingToken.decimals();
+            if (underlying == NATIVE_TOKEN) {
+                return 10 ** 18;
+            } else {
+                IERC20Metadata underlyingToken = IERC20Metadata(underlying);
+                return 10 ** underlyingToken.decimals();
+            }
         } else {
             return periodUnitNav[settlementPeriod - 1];
         }

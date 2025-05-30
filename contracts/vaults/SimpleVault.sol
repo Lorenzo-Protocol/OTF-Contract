@@ -44,14 +44,30 @@ contract SimpleVault is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
 
+    receive() external payable {}
+
+    // @dev transfer from/to underlying token
+    function sendUnderlying(address to, uint256 underlyingAmount) internal {
+        if (underlying == NATIVE_TOKEN) {
+            (bool success, bytes memory data) = to.call{value: underlyingAmount}("");
+            require(success, string(data));
+        } else {
+            IERC20 underlyingToken = IERC20(underlying);
+            SafeERC20.safeTransfer(underlyingToken, to, underlyingAmount);
+        }
+    }
+
     // to handle the depoisted underlying asset
     function onDepositUnderlying(address from, uint256 underlyingAmount)
         internal
         override
     {
-        IERC20 underlyingToken = IERC20(underlying);
-
-        SafeERC20.safeTransferFrom(underlyingToken, from, address(this), underlyingAmount);
+        if (underlying == NATIVE_TOKEN) {
+            require(msg.value == underlyingAmount, "send value != deposit amount");
+        } else {
+            IERC20 underlyingToken = IERC20(underlying);
+            SafeERC20.safeTransferFrom(underlyingToken, from, address(this), underlyingAmount);
+        }
 
         address[] memory portfolios = _portfolios.values();
         uint256 len = portfolios.length;
@@ -61,13 +77,13 @@ contract SimpleVault is
             uint256 weight = portfolioWeights[portfolio];
             uint256 splitUnderlying = (underlyingAmount * weight) / Precision;
 
-            SafeERC20.safeTransfer(underlyingToken, portfolio, splitUnderlying);
+            sendUnderlying(portfolio, splitUnderlying);
             totalTransferred += splitUnderlying;
             unchecked { i++; }
         }
 
         if (totalTransferred < underlyingAmount) {
-            SafeERC20.safeTransfer(underlyingToken, portfolios[0], underlyingAmount - totalTransferred);
+            sendUnderlying(portfolios[0], underlyingAmount - totalTransferred);
         }
     }
     // to handle the withdrawed underlying asset
@@ -75,7 +91,6 @@ contract SimpleVault is
         internal
         override
     {
-        IERC20 underlyingToken = IERC20(underlying);
-        SafeERC20.safeTransfer(underlyingToken, to, underlyingAmount);
+        sendUnderlying(to, underlyingAmount);
     }
 }
