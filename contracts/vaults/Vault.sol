@@ -8,6 +8,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IVault, YieldType} from "../intf/IVault.sol";
 import {VaultBase} from "./VaultBase.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "hardhat/console.sol";
 
@@ -35,12 +36,12 @@ abstract contract Vault is
 
     // @dev while users deposit underlying asset, how to allocate the asset to different portfolios,
     //  for different yield type vault, it should be implemented by different way
-    function onDepositUnderlying(address from, uint256 underlyingAmount) internal virtual;
+    function onDepositUnderlying(address from, uint256 underlyingAmount) internal virtual returns (uint256 sharesAmount, uint256 unitNav);
     // @dev while users withdraw underlying asset, how to withdraw the asset from different portfolios,
     //    implement by different way for different yield type vault
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
 
-    function updatePortfolios(address[] calldata portfolios_, uint256[] calldata weights_) public onlyManager {
+    function updatePortfolios(address[] memory  portfolios_, uint256[] memory weights_) public onlyManager {
         uint256 totalWeight;
         uint256 len = portfolios_.length;
         for (uint256 i = 0; i < len; ) {
@@ -147,6 +148,17 @@ abstract contract Vault is
         _unpause();
     }
 
+    // @dev transfer from/to underlying token
+    function sendUnderlying(address to, uint256 underlyingAmount) internal {
+        if (underlying == NATIVE_TOKEN) {
+            (bool success, bytes memory data) = to.call{value: underlyingAmount}("");
+            require(success, string(data));
+        } else {
+            IERC20 underlyingToken = IERC20(underlying);
+            SafeERC20.safeTransfer(underlyingToken, to, underlyingAmount);
+        }
+    }
+
     // @dev set the shares transferable or not
     function setTransferable(bool transferable_) external onlyManager {
         require(transferable != transferable_, "same transferable");
@@ -228,8 +240,7 @@ abstract contract Vault is
     {
         require(underlyingAmount >= minDepositAmount, "deposit amount too small");
 
-        onDepositUnderlying(msg.sender, underlyingAmount);
-        (uint256 sharesAmount, uint256 unitNav) = mintShares(msg.sender, underlyingAmount);
+        (uint256 sharesAmount, uint256 unitNav) = onDepositUnderlying(msg.sender, underlyingAmount);
 
         // emit enough information for accounting
         address[] memory p = portfolios();
@@ -320,7 +331,7 @@ abstract contract Vault is
     // @param to the target address
     // @param underlyingAmount the amount of underlying asset
     function mintShares(address to, uint256 underlyingAmount) internal returns(uint256 sharesAmount, uint256 unitNav) {
-        unitNav = getCurrentUnitNav();
+        unitNav = getUnitNav(settlementPeriod);
         require(unitNav > 0, "oops: zero unit nav");
         sharesAmount = (underlyingAmount * Precision) / unitNav;
 
@@ -356,8 +367,9 @@ abstract contract Vault is
         return result;
     }
     // @dev get current unit nav
-    function getCurrentUnitNav() public view returns (uint256) {
-        if (settlementPeriod == 1) {
+    // @param period the period to get the unit nav, period should gte 1
+    function getUnitNav(uint128 period) public view returns (uint256) {
+        if (period == 1) {
             if (underlying == NATIVE_TOKEN) {
                 return 10 ** 18;
             } else {
@@ -365,7 +377,7 @@ abstract contract Vault is
                 return 10 ** underlyingToken.decimals();
             }
         } else {
-            return periodUnitNav[settlementPeriod - 1];
+            return periodUnitNav[period - 1];
         }
     }
 }

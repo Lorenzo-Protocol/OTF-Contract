@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import path from "path";
 
 export async function preDeploy() {
   const [boss, admin, operator, player1, player2, player3, portfolio1, portfolio2, portfolio3] = await ethers.getSigners();
@@ -20,6 +21,21 @@ export async function preDeploy() {
   await ManagerProxy.waitForDeployment();
 
   const CeDeFiManager = await ethers.getContractAt('CeDeFiManager', ManagerProxy.target);
+  // add support functions
+  const Vault =  new ethers.Interface(require(path.join(__dirname, '..', 'artifacts', 'contracts', 'vaults', 'Vault.sol', 'Vault.json')).abi);
+  await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
+    Vault.getFunction('updatePortfolios')!.selector,
+    Vault.getFunction('setMinDepositAmount')!.selector,
+    Vault.getFunction('setMinWithdrawAmount')!.selector,
+    Vault.getFunction('setUnitNav')!.selector,
+    Vault.getFunction('addBlacklist')!.selector,
+    Vault.getFunction('removeBlacklist')!.selector,
+    Vault.getFunction('freezeShares')!.selector,
+    Vault.getFunction('unfreezeShares')!.selector,
+    Vault.getFunction('setTransferable')!.selector,
+    Vault.getFunction('pause')!.selector,
+    Vault.getFunction('unpause')!.selector,
+  ], [true, true, true, true, true, true, true, true, true, true, true]);
 
   return {boss, admin, operator, player1, player2, player3, CeDeFiManager, BBTC, portfolio1, portfolio2, portfolio3};
 }

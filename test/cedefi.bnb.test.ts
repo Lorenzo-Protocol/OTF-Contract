@@ -9,7 +9,7 @@ import { preDeploy } from "./common";
 const Precesion = ethers.parseEther("1");
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
-describe("CeDeFiManager", function () {
+describe("BNB Vault", function () {
 let AllContracts: any;
 
 this.beforeEach(async function () {
@@ -47,21 +47,6 @@ it("create Vault", async function () {
       },
       implementation.target
     );
-    // add support functions
-    await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
-      implementation.interface.getFunction('updatePortfolios').selector,
-      implementation.interface.getFunction('setMinDepositAmount').selector,
-      implementation.interface.getFunction('setMinWithdrawAmount').selector,
-      implementation.interface.getFunction('setUnitNav').selector,
-      implementation.interface.getFunction('addBlacklist').selector,
-      implementation.interface.getFunction('removeBlacklist').selector,
-      implementation.interface.getFunction('freezeShares').selector,
-      implementation.interface.getFunction('unfreezeShares').selector,
-      implementation.interface.getFunction('setTransferable').selector,
-      implementation.interface.getFunction('pause').selector,
-      implementation.interface.getFunction('unpause').selector,
-    ], [true, true, true, true, true, true, true, true, true, true, true]);
-
 
     const vaultAddress= await CeDeFiManager.getVault(0);
     const hgBNBVault = await ethers.getContractAt("SimpleVault", vaultAddress);

@@ -46,21 +46,11 @@ contract SimpleVault is
 
     receive() external payable {}
 
-    // @dev transfer from/to underlying token
-    function sendUnderlying(address to, uint256 underlyingAmount) internal {
-        if (underlying == NATIVE_TOKEN) {
-            (bool success, bytes memory data) = to.call{value: underlyingAmount}("");
-            require(success, string(data));
-        } else {
-            IERC20 underlyingToken = IERC20(underlying);
-            SafeERC20.safeTransfer(underlyingToken, to, underlyingAmount);
-        }
-    }
-
     // to handle the depoisted underlying asset
     function onDepositUnderlying(address from, uint256 underlyingAmount)
         internal
         override
+        returns (uint256 sharesAmount, uint256 unitNav)
     {
         if (underlying == NATIVE_TOKEN) {
             require(msg.value == underlyingAmount, "send value != deposit amount");
@@ -85,6 +75,8 @@ contract SimpleVault is
         if (totalTransferred < underlyingAmount) {
             sendUnderlying(portfolios[0], underlyingAmount - totalTransferred);
         }
+        // mint all the shares to depositor
+        (sharesAmount, unitNav) = mintShares(from, underlyingAmount);
     }
     // to handle the withdrawed underlying asset
     function onWithdrawUnderlying(address to, uint256 underlyingAmount)
