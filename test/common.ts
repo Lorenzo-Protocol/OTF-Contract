@@ -2,10 +2,13 @@ import { ethers } from "hardhat";
 import path from "path";
 
 export async function preDeploy() {
-  const [boss, admin, operator, player1, player2, player3, portfolio1, portfolio2, portfolio3] = await ethers.getSigners();
+  const [boss, admin, operator, player1, player2, player3, signer1, portfolio1, portfolio2, portfolio3] = await ethers.getSigners();
 
-  const BBTC = await ethers.deployContract("TestBBTC");
+  const BBTC = await ethers.deployContract("TestToken", ["Test BBTC", "BBTC"]);
   await BBTC.waitForDeployment();
+
+  const USD1 = await ethers.deployContract("TestToken", ["Test USD1", "USD1"]);
+  await USD1.waitForDeployment();
 
   const ManagerImpl = await ethers.deployContract("CeDeFiManager");
   await ManagerImpl.waitForDeployment();
@@ -37,5 +40,5 @@ export async function preDeploy() {
     Vault.getFunction('unpause')!.selector,
   ], [true, true, true, true, true, true, true, true, true, true, true]);
 
-  return {boss, admin, operator, player1, player2, player3, CeDeFiManager, BBTC, portfolio1, portfolio2, portfolio3};
+  return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, portfolio1, portfolio2, portfolio3};
 }

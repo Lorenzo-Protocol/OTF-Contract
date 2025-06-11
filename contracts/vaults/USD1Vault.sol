@@ -19,15 +19,20 @@ contract USD1Vault is
     Vault
 {
     using EnumerableSet for EnumerableSet.AddressSet;
+    // users deposit usd1 to the vault, and get a pending shares waiting for KYT
     event PendingShares(address indexed user, uint128 indexed period, uint256 shares);
-    event ConfirmShare (address indexed user, uint128 indexed period, uint256 shares);
-    event RefundShare  (address indexed user, uint128 indexed period, uint256 shares);
+    // users confirm the shares after KYT passed
+    event ConfirmShares (address indexed user, uint128 indexed period, uint256 shares);
+    // users refund the shares after KYT failed
+    event RefundShares  (address indexed user, uint128 indexed period, uint256 shares);
 
-    bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,address user,uint256 sharesAmount)");
-    bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,address user,uint256 sharesAmount)");
+    bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
+    bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
 
     mapping(address => mapping(uint128 => uint256)) public pendingShares; // user -> period -> pending shares
     mapping(address => bool) public signers; // signer -> is signer
+    mapping(address => uint256) public confirmNonce; // user -> confirm nonce
+    mapping(address => uint256) public refundNonce; // user -> refund nonce
 
     constructor() {
         _disableInitializers();
@@ -45,12 +50,14 @@ contract USD1Vault is
         string calldata name_,
         string calldata symbol_,
         address underlying_,
-        address ceffWallet_,
+        address[] memory portfolios_,
+        uint256[] memory weights_,
         address cedefiManager_
     ) public initializer {
         require(underlying_ != address(0), "Invalid underlying");
-        require(ceffWallet_ != address(0), "Invalid ceff wallet");
         require(cedefiManager_ != address(0), "Invalid cedefi manager");
+        require(portfolios_.length == weights_.length, "mismatch length of portfolios and weights");
+        require(portfolios_.length == 1, "only accept one portfolio");
 
         __EIP712_init("USD1Vault", "1.0");
         __UUPSUpgradeable_init();
@@ -62,12 +69,7 @@ contract USD1Vault is
         settlementPeriod = 1;
         transferable = true;
 
-        // only accept one ceffu wallet as portfolio
-        address[] memory portfolios = new address[](1);
-        portfolios[0] = ceffWallet_;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = Precision;
-        updatePortfolios(portfolios, weights);
+        updatePortfolios(portfolios_, weights_);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
@@ -125,10 +127,12 @@ contract USD1Vault is
             CONFIRM_SHARE,
             period,
             msg.sender,
-            sharesAmount
+            sharesAmount,
+            confirmNonce[msg.sender]
         )));
         address signer = ECDSA.recover(hash, signature);
         require(signers[signer], "Invalid signer");
+        confirmNonce[msg.sender]++;
 
         // sub the pending shares
         pendingShares[msg.sender][period] -= sharesAmount;
@@ -137,7 +141,7 @@ contract USD1Vault is
         _mint(msg.sender, sharesAmount);
 
         // emit the event
-        emit ConfirmShare(msg.sender, period, sharesAmount);
+        emit ConfirmShares(msg.sender, period, sharesAmount);
     }
     // @dev refund the shares
     // if the deposit failed KYT, then the user can refund the shares
@@ -150,15 +154,16 @@ contract USD1Vault is
             REFUND_SHARE,
             period,
             msg.sender,
-            sharesAmount
+            sharesAmount,
+            refundNonce[msg.sender]
         )));
         address signer = ECDSA.recover(hash, signature);
         require(signers[signer], "Invalid signer");
-
+        refundNonce[msg.sender]++;
         // sub the pending shares
         pendingShares[msg.sender][period] -= sharesAmount;
 
         // emit the event
-        emit RefundShare(msg.sender, period, sharesAmount);
+        emit RefundShares(msg.sender, period, sharesAmount);
     }
 }

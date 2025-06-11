@@ -1,5 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 const accounts =
   process.env.PK !== undefined ? [process.env.PK] :
@@ -68,7 +70,7 @@ const config: HardhatUserConfig = {
     },
     bsctest: {
       url: 'https://bsc-testnet.public.blastapi.io',
-      accounts
+      accounts: [process.env.BSC_TESTNET_KEY!]
     },
     bsc: {
       url: "https://bsc-rpc.publicnode.com",
