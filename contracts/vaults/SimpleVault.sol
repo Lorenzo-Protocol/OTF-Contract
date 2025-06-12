@@ -8,8 +8,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Vault} from "./Vault.sol";
 import {YieldType} from "../intf/IVault.sol";
 
-import "hardhat/console.sol";
-
 contract SimpleVault is
     UUPSUpgradeable,
     Vault

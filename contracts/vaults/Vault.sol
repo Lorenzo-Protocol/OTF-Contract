@@ -169,6 +169,7 @@ abstract contract Vault is
     // @dev total supply of shares, it should substract the withdrew shares of unsettled withdraw requests
     function totalSupply()
         public
+        virtual
         view
         override(IERC20, ERC20Upgradeable)
         returns (uint256)
@@ -180,6 +181,7 @@ abstract contract Vault is
     // @dev transfer shares token to the target address, should check the freezed shares
     function transfer(address recipient, uint256 amount)
         public
+        virtual
         override(IERC20, ERC20Upgradeable)
         whenNotPaused
         notBlacklisted
@@ -194,6 +196,7 @@ abstract contract Vault is
     //  not allowed approve someone else to transfer shares
     function transferFrom(address from, address to, uint256 value)
         public
+        virtual
         override(IERC20, ERC20Upgradeable)
         whenNotPaused
         notBlacklisted
@@ -259,7 +262,8 @@ abstract contract Vault is
 
     // @dev request to withdraw shares, it will be executed while current period is settled
     function requestWithdraw(uint256 shareAmount)
-        external
+        public
+        virtual
         whenNotPaused
         notBlacklisted
         lock
@@ -297,7 +301,8 @@ abstract contract Vault is
     //    only executalbe while the period is settled
     //    the requestId must be call `requestWithdraw` to get
     function withdraw(uint128 requestId)
-        external
+        public
+        virtual
         whenNotPaused
         notBlacklisted
         lock

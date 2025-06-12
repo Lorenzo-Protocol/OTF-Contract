@@ -11,8 +11,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Vault} from "./Vault.sol";
 import {YieldType} from "../intf/IVault.sol";
 
-import "hardhat/console.sol";
-
 contract USD1Vault is
     UUPSUpgradeable,
     EIP712Upgradeable,
