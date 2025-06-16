@@ -49,8 +49,29 @@ async function getClaimSinature(operator: any, contract: string, period: bigint,
   return signature;
 }
 
+async function deployUSD1PlusVault(susd1Vault: string) {
+  const {admin} = AllContracts;
+  const implementation = await ethers.deployContract("USD1PlusVault");
+  await implementation.waitForDeployment();
+
+  const initdata = implementation.interface.encodeFunctionData(
+    'initialize',
+    [
+      admin.address,
+      susd1Vault
+    ]
+  );
+
+  const USD1PlusVaultProxy = await ethers.deployContract("ERC1967Proxy", [implementation.target, initdata]);
+  await USD1PlusVaultProxy.waitForDeployment();
+
+  const USD1PlusVault = await ethers.getContractAt("USD1PlusVault", USD1PlusVaultProxy.target);
+
+  return {USD1PlusVault};
+}
+
 it("work flow", async function () {
-    const {admin, CeDeFiManager, USD1, player1, portfolio1, signer1} = AllContracts;
+    const {admin, CeDeFiManager, USD1, player1, player2, portfolio1, signer1} = AllContracts;
 
 
     const minDepositAmount = ethers.parseEther("50");
@@ -79,10 +100,12 @@ it("work flow", async function () {
 
     const vaultAddress= await CeDeFiManager.getVault(0);
     const usd1Vault = await ethers.getContractAt("USD1Vault", vaultAddress);
+
     // 增加setSigner函数
     await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
       usd1Vault.interface.getFunction('setSigner')!.selector,
-    ], [true]);
+      usd1Vault.interface.getFunction('setUsd1PlusVault')!.selector,
+    ], [true, true]);
 
     // set unit nav
     const setSigners = usd1Vault.interface.encodeFunctionData(
@@ -90,6 +113,15 @@ it("work flow", async function () {
       [[signer1.address], [true]]
     );
     await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setSigners);
+
+    // set the usd1 plus vault
+    const {USD1PlusVault} = await deployUSD1PlusVault(usd1Vault.target as string);
+
+    const setUsd1PlusVault = usd1Vault.interface.encodeFunctionData(
+      'setUsd1PlusVault',
+      [USD1PlusVault.target]
+    );
+    await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setUsd1PlusVault);
 
     await USD1.connect(player1).approve(usd1Vault.target, ethers.parseEther("1000"));
 
@@ -116,9 +148,19 @@ it("work flow", async function () {
 
     await time.increase(86400 * 30);
 
+    const sharesAmount = (await usd1Vault.balanceOf(player1.address)) / 2n;
+    await usd1Vault.connect(player1).swapToUsd1Plus(player1.address, sharesAmount);
+
+    // nav 为 1, 所以100 shares 对应 100 USD1+
+    expect(await USD1PlusVault.balanceOf(player1.address)).to.equal(depositAmount / 2n);
+    // transfer 50 USD1+ to player2
+    await USD1PlusVault.connect(player1).transfer(player2.address, sharesAmount / 2n);
+
+    expect(await USD1PlusVault.balanceOf(player2.address)).to.equal(depositAmount / 4n);
+
     // to withdraw
     const requestId = await usd1Vault.settlementPeriod();
-    const withdrawSharesAmount = ethers.parseEther("50");
+    const withdrawSharesAmount = await usd1Vault.balanceOf(player1.address);
     await usd1Vault.connect(player1).requestWithdraw(withdrawSharesAmount);
 
     const rawTotalUSD1 = await usd1Vault.totalSupply();
@@ -136,6 +178,16 @@ it("work flow", async function () {
     const totalUSD1 = await usd1Vault.totalSupply();
     expect(totalUSD1).to.equal(rawTotalUSD1 - withdrawSharesAmount);
     expect(2n).to.equal(await usd1Vault.settlementPeriod());
+
+    // player1和player2的USD1+份额都为 depositAmount * 1.1 / 2
+    expect(await USD1PlusVault.balanceOf(player1.address)).to.equal(depositAmount * 11n / 40n);
+    expect(await USD1PlusVault.balanceOf(player2.address)).to.equal(depositAmount * 11n / 40n);
+
+    // player2redeem它的balance之后, 仍然应该拿到sharesAmount / 2
+    const p2BalanceBefore = await USD1PlusVault.balanceOf(player2.address);
+    await USD1PlusVault.connect(player2).redeem(player2.address, p2BalanceBefore);
+    expect(await USD1PlusVault.balanceOf(player2.address)).to.equal(0n);
+    expect(await usd1Vault.balanceOf(player2.address)).to.equal(sharesAmount / 2n);
 
     // rebalance underlying asset offline
     await USD1.mint(usd1Vault.target, ethers.parseEther("100"));

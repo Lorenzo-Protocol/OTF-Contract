@@ -269,6 +269,7 @@ abstract contract Vault is
         lock
         returns (uint128)
     {
+        require(shareAmount > 0, "share amount is zero");
         uint256 sharesBalance = getUsableShares(msg.sender);
         if (shareAmount != sharesBalance) { // make sure sender can withdraw all shares
             require(shareAmount >= minWithdrawAmount, "withdraw amount too small");

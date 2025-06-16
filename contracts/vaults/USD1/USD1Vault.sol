@@ -8,8 +8,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {Vault} from "./Vault.sol";
-import {YieldType} from "../intf/IVault.sol";
+import {Vault} from "../Vault.sol";
+import {YieldType} from "../../intf/IVault.sol";
+import {IUSD1PlusVault} from "./IUSD1PlusVault.sol";
 
 contract USD1Vault is
     UUPSUpgradeable,
@@ -23,6 +24,12 @@ contract USD1Vault is
     event ConfirmShares (address indexed user, uint128 indexed period, uint256 shares);
     // users refund the shares after KYT failed
     event RefundShares  (address indexed user, uint128 indexed period, uint256 shares);
+    // usd1 plus vault set
+    event Usd1PlusVaultSet(address indexed usd1PlusVault);
+    // swap usd1+ to susd1
+    event SwapUsd1PlusToSusd1(address indexed user, uint256 sharesAmount);
+    // swap susd1 to usd1+
+    event SwapSusd1ToUsd1Plus(address indexed from, address indexed to, uint256 sharesAmount);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
@@ -31,6 +38,8 @@ contract USD1Vault is
     mapping(address => bool) public signers; // signer -> is signer
     mapping(address => uint256) public confirmNonce; // user -> confirm nonce
     mapping(address => uint256) public refundNonce; // user -> refund nonce
+
+    IUSD1PlusVault public usd1PlusVault;
 
     constructor() {
         _disableInitializers();
@@ -74,6 +83,13 @@ contract USD1Vault is
 
     receive() external payable {
         revert("Not allowed to receive native token");
+    }
+
+    // @dev set the usd1 plus vault address
+    function setUsd1PlusVault(address _usd1PlusVault) public onlyManager {
+        require(_usd1PlusVault != address(0), "invalid usd1 plus vault");
+        usd1PlusVault = IUSD1PlusVault(_usd1PlusVault);
+        emit Usd1PlusVaultSet(_usd1PlusVault);
     }
 
     // @dev set the signer
@@ -163,5 +179,29 @@ contract USD1Vault is
 
         // emit the event
         emit RefundShares(msg.sender, period, sharesAmount);
+    }
+
+    // @dev swap usd1+ to susd1
+    // only usd1 plus vault can call
+    function swapToSusd1(address to, uint256 sharesAmount) public {
+        require(msg.sender == address(usd1PlusVault), "only usd1 plus vault can call");
+
+        _transfer(address(usd1PlusVault), to, sharesAmount);
+
+        emit SwapUsd1PlusToSusd1(to, sharesAmount);
+    }
+
+    // @dev swap susd1 to usd1+
+    function swapToUsd1Plus(address receiver, uint256 sharesAmount) public {
+        require(receiver != address(0), "invalid receiver");
+        require(sharesAmount > 0, "invalid shares amount");
+
+        // lock the shares
+        _transfer(msg.sender, address(usd1PlusVault), sharesAmount);
+
+        // mint the shares to the receiver
+        usd1PlusVault.mint(receiver, sharesAmount);
+
+        emit SwapSusd1ToUsd1Plus(msg.sender, receiver, sharesAmount);
     }
 }
