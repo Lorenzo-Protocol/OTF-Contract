@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IUSD1Vault} from "./IUSD1Vault.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 /**
  * @title USD1PlusVault
@@ -14,17 +15,21 @@ import {IUSD1Vault} from "./IUSD1Vault.sol";
 contract USD1PlusVault is
     UUPSUpgradeable,
     ERC20Upgradeable,
-    OwnableUpgradeable
+    AccessControlUpgradeable
 {
     uint256 public constant PRECISION = 1e18;
+    bytes32 public constant OWNER_ROLE = keccak256("VAULT_ROLE");
+    bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
 
     event MintUsd1Plus(address indexed to, uint256 sharesAmount);
     event RedeemUsd1Plus(address indexed to, uint256 sharesAmount);
     event Usd1VaultSet(address indexed usd1Vault);
+    event Freeze(address indexed account, uint256 sharesAmount);
+    event Unfreeze(address indexed account, uint256 sharesAmount);
 
     IUSD1Vault public usd1Vault;
 
-
+    mapping(address => uint256) public freezedShares;
 // ------------------------------------------
     modifier onlyVault() {
         require(msg.sender == address(usd1Vault), "only vault can call");
@@ -37,17 +42,28 @@ contract USD1PlusVault is
 
     function initialize(
         address _owner,
-        address _susd1Vault
+        address _susd1Vault,
+        address[] memory _freezers
     ) public initializer {
         require(_owner != address(0), "invalid owner");
         require(_susd1Vault != address(0), "invalid usd1 vault");
 
         __ERC20_init("USD1+", "USD1+");
-        __Ownable_init(_owner);
+        __AccessControl_init();
+
+        _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
+        _setRoleAdmin(FREEZER_ROLE, OWNER_ROLE);
+
+        _grantRole(OWNER_ROLE, _owner);
+        _grantRole(FREEZER_ROLE, _owner);
+
+        for (uint256 i; i < _freezers.length; i++) {
+            _grantRole(FREEZER_ROLE, _freezers[i]);
+        }
         usd1Vault = IUSD1Vault(_susd1Vault);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER_ROLE) {}
 
     // @dev convert onePlusAmount to shares
     function convertToShares(uint256 onePlusAmount) internal view returns (uint256) {
@@ -87,12 +103,14 @@ contract USD1PlusVault is
     // @dev transfer onePlusAmount to the target address, internally convert to shares and transfer
     function transfer(address to, uint256 onePlusAmount) public override(ERC20Upgradeable) returns (bool) {
         uint256 shares = convertToShares(onePlusAmount);
+        require(getUseableShares(msg.sender) >= shares, "can not transfer so much shares");
         return super.transfer(to,shares);
     }
 
     // @dev transferFrom onePlusAmount from the source address to the target address, internally convert to shares and transfer
     function transferFrom(address from, address to, uint256 onePlusAmount) public override(ERC20Upgradeable) returns (bool) {
         uint256 shares = convertToShares(onePlusAmount);
+        require(getUseableShares(from) >= shares, "can not transfer so much shares");
         return super.transferFrom(from, to, shares);
     }
 
@@ -109,10 +127,36 @@ contract USD1PlusVault is
     }
 
     // @dev set the usd1 vault address
-    function setUsd1Vault(address _usd1Vault) public onlyOwner {
+    function setUsd1Vault(address _usd1Vault) public onlyRole(OWNER_ROLE) {
         require(_usd1Vault != address(0), "invalid usd1 vault");
         usd1Vault = IUSD1Vault(_usd1Vault);
         emit Usd1VaultSet(_usd1Vault);
+    }
+
+    // @dev calculate the useable shares amount
+    function getUseableShares(address account) public view returns (uint256) {
+        return super.balanceOf(account) - freezedShares[account];
+    }
+
+    // @dev freeze the shares of the target address
+    function freeze(address account, uint256 onePlusAmount) public onlyRole(FREEZER_ROLE) {
+        require(onePlusAmount > 0, "invalid onePlusAmount");
+        uint256 sharesAmount = convertToShares(onePlusAmount);
+        require(sharesAmount <= getUseableShares(account), "can not freeze so much shares");
+
+        freezedShares[account] += sharesAmount;
+
+        emit Freeze(account, sharesAmount);
+    }
+
+    // @dev unfreeze the shares of the target address
+    function unfreeze(address account, uint256 sharesAmount) public onlyRole(FREEZER_ROLE) {
+        require(sharesAmount > 0, "shares amount is zero");
+        require(freezedShares[account] >= sharesAmount, "can not unfreeze so much shares");
+
+        freezedShares[account] -= sharesAmount;
+
+        emit Unfreeze(account, sharesAmount);
     }
 
     // @dev issue USD1+ to the target address,
