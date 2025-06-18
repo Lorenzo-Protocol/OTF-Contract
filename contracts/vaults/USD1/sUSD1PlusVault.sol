@@ -12,7 +12,7 @@ import {Vault} from "../Vault.sol";
 import {YieldType} from "../../intf/IVault.sol";
 import {IUSD1PlusVault} from "./IUSD1PlusVault.sol";
 
-contract USD1Vault is
+contract sUSD1PlusVault is
     UUPSUpgradeable,
     EIP712Upgradeable,
     Vault

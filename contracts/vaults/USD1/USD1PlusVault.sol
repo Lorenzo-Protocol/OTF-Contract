@@ -5,7 +5,7 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IUSD1Vault} from "./IUSD1Vault.sol";
+import {IsUSD1PlusVault} from "./IsUSD1PlusVault.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 /**
@@ -23,16 +23,16 @@ contract USD1PlusVault is
 
     event MintUsd1Plus(address indexed to, uint256 sharesAmount);
     event RedeemUsd1Plus(address indexed to, uint256 sharesAmount);
-    event Usd1VaultSet(address indexed usd1Vault);
+    event Usd1VaultSet(address indexed susd1Vault);
     event Freeze(address indexed account, uint256 sharesAmount);
     event Unfreeze(address indexed account, uint256 sharesAmount);
 
-    IUSD1Vault public usd1Vault;
+    IsUSD1PlusVault public susd1Vault;
 
     mapping(address => uint256) public freezedShares;
 // ------------------------------------------
     modifier onlyVault() {
-        require(msg.sender == address(usd1Vault), "only vault can call");
+        require(msg.sender == address(susd1Vault), "only vault can call");
         _;
     }
 
@@ -48,7 +48,7 @@ contract USD1PlusVault is
         require(_owner != address(0), "invalid owner");
         require(_susd1Vault != address(0), "invalid usd1 vault");
 
-        __ERC20_init("USD1+", "USD1+");
+        __ERC20_init("Lorenzo USD1+", "USD1+");
         __AccessControl_init();
 
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
@@ -60,29 +60,29 @@ contract USD1PlusVault is
         for (uint256 i; i < _freezers.length; i++) {
             _grantRole(FREEZER_ROLE, _freezers[i]);
         }
-        usd1Vault = IUSD1Vault(_susd1Vault);
+        susd1Vault = IsUSD1PlusVault(_susd1Vault);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER_ROLE) {}
 
     // @dev convert onePlusAmount to shares
     function convertToShares(uint256 onePlusAmount) internal view returns (uint256) {
-        uint128 settlementPeriod = usd1Vault.settlementPeriod();
-        uint256 nav = usd1Vault.getUnitNav(settlementPeriod);
+        uint128 settlementPeriod = susd1Vault.settlementPeriod();
+        uint256 nav = susd1Vault.getUnitNav(settlementPeriod);
         return onePlusAmount * PRECISION / nav;
     }
 
     // @dev convert shares to onePlusAmount
     function convertToOnePlus(uint256 shares) internal view returns (uint256) {
-        uint128 settlementPeriod = usd1Vault.settlementPeriod();
-        uint256 nav = usd1Vault.getUnitNav(settlementPeriod);
+        uint128 settlementPeriod = susd1Vault.settlementPeriod();
+        uint256 nav = susd1Vault.getUnitNav(settlementPeriod);
         return shares * nav / PRECISION;
     }
 
     // @dev get the total pooled underlying amount
     function totalPooledUnderlying() public view returns (uint256) {
-        uint128 settlementPeriod = usd1Vault.settlementPeriod();
-        uint256 nav = usd1Vault.getUnitNav(settlementPeriod);
+        uint128 settlementPeriod = susd1Vault.settlementPeriod();
+        uint256 nav = susd1Vault.getUnitNav(settlementPeriod);
         uint256 totalShares = super.totalSupply();
         return nav * totalShares / PRECISION;
     }
@@ -95,8 +95,8 @@ contract USD1PlusVault is
         returns (uint256)
     {
         uint256 shares = super.balanceOf(account);
-        uint128 settlementPeriod = usd1Vault.settlementPeriod();
-        uint256 nav = usd1Vault.getUnitNav(settlementPeriod);
+        uint128 settlementPeriod = susd1Vault.settlementPeriod();
+        uint256 nav = susd1Vault.getUnitNav(settlementPeriod);
         return shares * nav / PRECISION;
     }
 
@@ -127,10 +127,10 @@ contract USD1PlusVault is
     }
 
     // @dev set the usd1 vault address
-    function setUsd1Vault(address _usd1Vault) public onlyRole(OWNER_ROLE) {
-        require(_usd1Vault != address(0), "invalid usd1 vault");
-        usd1Vault = IUSD1Vault(_usd1Vault);
-        emit Usd1VaultSet(_usd1Vault);
+    function setUsd1Vault(address _susd1Vault) public onlyRole(OWNER_ROLE) {
+        require(_susd1Vault != address(0), "invalid usd1 vault");
+        susd1Vault = IsUSD1PlusVault(_susd1Vault);
+        emit Usd1VaultSet(_susd1Vault);
     }
 
     // @dev calculate the useable shares amount
@@ -160,19 +160,19 @@ contract USD1PlusVault is
     }
 
     // @dev issue USD1+ to the target address,
-    // users call the `usd1Vault.swap` to exchange sUSD1 to USD1+
+    // users call the `susd1Vault.swap` to exchange sUSD1 to USD1+
     function mint(address to, uint256 sharesAmount) public onlyVault {
        _mint(to, sharesAmount);
        emit MintUsd1Plus(to, sharesAmount);
     }
 
     // @dev redeem USD1+ to the target address
-    // users call the `usd1Vault.swapBack` to exchange USD1+ to sUSD1
+    // users call the `susd1Vault.swapBack` to exchange USD1+ to sUSD1
     function redeem(address to, uint256 onePlusAmount) public {
         uint256 sharesAmount = convertToShares(onePlusAmount);
         _burn(msg.sender, sharesAmount);
 
-        usd1Vault.swapToSusd1(to, sharesAmount);
+        susd1Vault.swapToSusd1(to, sharesAmount);
 
         emit RedeemUsd1Plus(to, onePlusAmount);
     }

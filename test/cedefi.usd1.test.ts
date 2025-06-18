@@ -58,7 +58,8 @@ async function deployUSD1PlusVault(susd1Vault: string) {
     'initialize',
     [
       admin.address,
-      susd1Vault
+      susd1Vault,
+      [admin.address]
     ]
   );
 
@@ -79,7 +80,7 @@ it("work flow", async function () {
     const pp1 = ethers.parseEther("1.0");
 
     await CeDeFiManager.connect(admin).addPortfolios([portfolio1.address]);
-    const implementation = await ethers.deployContract("USD1Vault");
+    const implementation = await ethers.deployContract("sUSD1PlusVault");
     await implementation.waitForDeployment();
 
     await CeDeFiManager.connect(admin).createVault(
@@ -99,34 +100,34 @@ it("work flow", async function () {
     await USD1.mint(player1.address, ethers.parseEther("1000"));
 
     const vaultAddress= await CeDeFiManager.getVault(0);
-    const usd1Vault = await ethers.getContractAt("USD1Vault", vaultAddress);
+    const susd1Vault = await ethers.getContractAt("sUSD1PlusVault", vaultAddress);
 
     // 增加setSigner函数
     await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
-      usd1Vault.interface.getFunction('setSigner')!.selector,
-      usd1Vault.interface.getFunction('setUsd1PlusVault')!.selector,
+      susd1Vault.interface.getFunction('setSigner')!.selector,
+      susd1Vault.interface.getFunction('setUsd1PlusVault')!.selector,
     ], [true, true]);
 
     // set unit nav
-    const setSigners = usd1Vault.interface.encodeFunctionData(
+    const setSigners = susd1Vault.interface.encodeFunctionData(
       'setSigner',
       [[signer1.address], [true]]
     );
     await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setSigners);
 
     // set the usd1 plus vault
-    const {USD1PlusVault} = await deployUSD1PlusVault(usd1Vault.target as string);
+    const {USD1PlusVault} = await deployUSD1PlusVault(susd1Vault.target as string);
 
-    const setUsd1PlusVault = usd1Vault.interface.encodeFunctionData(
+    const setUsd1PlusVault = susd1Vault.interface.encodeFunctionData(
       'setUsd1PlusVault',
       [USD1PlusVault.target]
     );
     await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setUsd1PlusVault);
 
-    await USD1.connect(player1).approve(usd1Vault.target, ethers.parseEther("1000"));
+    await USD1.connect(player1).approve(susd1Vault.target, ethers.parseEther("1000"));
 
     const depositAmount = ethers.parseEther("100");
-    let t = await usd1Vault.connect(player1).deposit(depositAmount);
+    let t = await susd1Vault.connect(player1).deposit(depositAmount);
     await t.wait();
 
     const pp1Balance = await USD1.balanceOf(portfolio1.address);
@@ -137,19 +138,19 @@ it("work flow", async function () {
     expect(usd1Balance).to.equal(depositAmount);
 
     // 尚未确定份额，所以为0
-    expect(await usd1Vault.balanceOf(player1.address)).to.equal(0);
+    expect(await susd1Vault.balanceOf(player1.address)).to.equal(0);
 
-    const confirmNonce = await usd1Vault.confirmNonce(player1.address);
-    const signature = await getClaimSinature(signer1, usd1Vault.target as string, 1n, player1.address, depositAmount, confirmNonce);
-    await usd1Vault.connect(player1).confirmShare(1n, depositAmount, signature);
+    const confirmNonce = await susd1Vault.confirmNonce(player1.address);
+    const signature = await getClaimSinature(signer1, susd1Vault.target as string, 1n, player1.address, depositAmount, confirmNonce);
+    await susd1Vault.connect(player1).confirmShare(1n, depositAmount, signature);
 
     // 现在份额为100
-    expect(await usd1Vault.balanceOf(player1.address)).to.equal(depositAmount);
+    expect(await susd1Vault.balanceOf(player1.address)).to.equal(depositAmount);
 
     await time.increase(86400 * 30);
 
-    const sharesAmount = (await usd1Vault.balanceOf(player1.address)) / 2n;
-    await usd1Vault.connect(player1).swapToUsd1Plus(player1.address, sharesAmount);
+    const sharesAmount = (await susd1Vault.balanceOf(player1.address)) / 2n;
+    await susd1Vault.connect(player1).swapToUsd1Plus(player1.address, sharesAmount);
 
     // nav 为 1, 所以100 shares 对应 100 USD1+
     expect(await USD1PlusVault.balanceOf(player1.address)).to.equal(depositAmount / 2n);
@@ -159,25 +160,25 @@ it("work flow", async function () {
     expect(await USD1PlusVault.balanceOf(player2.address)).to.equal(depositAmount / 4n);
 
     // to withdraw
-    const requestId = await usd1Vault.settlementPeriod();
-    const withdrawSharesAmount = await usd1Vault.balanceOf(player1.address);
-    await usd1Vault.connect(player1).requestWithdraw(withdrawSharesAmount);
+    const requestId = await susd1Vault.settlementPeriod();
+    const withdrawSharesAmount = await susd1Vault.balanceOf(player1.address);
+    await susd1Vault.connect(player1).requestWithdraw(withdrawSharesAmount);
 
-    const rawTotalUSD1 = await usd1Vault.totalSupply();
-    const tShares = await usd1Vault.withdrewRequests(player1.address, requestId);
+    const rawTotalUSD1 = await susd1Vault.totalSupply();
+    const tShares = await susd1Vault.withdrewRequests(player1.address, requestId);
     expect(withdrawSharesAmount).to.equal(tShares[0]);
     expect(requestId).to.equal(tShares[1]);
 
     // set unit nav
-    const setUnitNavData = usd1Vault.interface.encodeFunctionData(
+    const setUnitNavData = susd1Vault.interface.encodeFunctionData(
       'setUnitNav',
       [ethers.parseEther("1.1")]
     );
 
     await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setUnitNavData);
-    const totalUSD1 = await usd1Vault.totalSupply();
+    const totalUSD1 = await susd1Vault.totalSupply();
     expect(totalUSD1).to.equal(rawTotalUSD1 - withdrawSharesAmount);
-    expect(2n).to.equal(await usd1Vault.settlementPeriod());
+    expect(2n).to.equal(await susd1Vault.settlementPeriod());
 
     // player1和player2的USD1+份额都为 depositAmount * 1.1 / 2
     expect(await USD1PlusVault.balanceOf(player1.address)).to.equal(depositAmount * 11n / 40n);
@@ -187,23 +188,23 @@ it("work flow", async function () {
     const p2BalanceBefore = await USD1PlusVault.balanceOf(player2.address);
     await USD1PlusVault.connect(player2).redeem(player2.address, p2BalanceBefore);
     expect(await USD1PlusVault.balanceOf(player2.address)).to.equal(0n);
-    expect(await usd1Vault.balanceOf(player2.address)).to.equal(sharesAmount / 2n);
+    expect(await susd1Vault.balanceOf(player2.address)).to.equal(sharesAmount / 2n);
 
     // rebalance underlying asset offline
-    await USD1.mint(usd1Vault.target, ethers.parseEther("100"));
+    await USD1.mint(susd1Vault.target, ethers.parseEther("100"));
 
     // withdraw
     const p1balanceBefore = await USD1.balanceOf(player1.address);
-    const p1usd1BalanceBefore = await usd1Vault.balanceOf(player1.address);
-    await usd1Vault.connect(player1).withdraw(requestId);
+    const p1usd1BalanceBefore = await susd1Vault.balanceOf(player1.address);
+    await susd1Vault.connect(player1).withdraw(requestId);
     const p1balanceAfter = await USD1.balanceOf(player1.address);
-    const p1usd1BalanceAfter = await usd1Vault.balanceOf(player1.address);
+    const p1usd1BalanceAfter = await susd1Vault.balanceOf(player1.address);
 
     const increaseAmount = withdrawSharesAmount * 11n/ 10n;
     expect(p1balanceAfter - p1balanceBefore).to.equal(increaseAmount);
     expect(p1usd1BalanceBefore - p1usd1BalanceAfter).to.equal(withdrawSharesAmount);
 
-    const usd1SupplyLatest = await usd1Vault.totalSupply();
+    const usd1SupplyLatest = await susd1Vault.totalSupply();
     expect(usd1SupplyLatest).to.equal(totalUSD1); // withdraw op don't impact the total supply of finBTC
   });
 
