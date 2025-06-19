@@ -21,7 +21,7 @@ this.beforeEach(async function () {
 
 // });
 
-async function getClaimSinature(operator: any, contract: string, period: bigint, user: string, sharesAmount: bigint, nonce: bigint) {
+async function getClaimSinature(operator: any, contract: string, period: bigint, user: string, sharesAmount: bigint, txHash: string) {
   const domain: TypedDataDomain = {
     name: "USD1Vault",
     version: "1.0",
@@ -32,17 +32,17 @@ async function getClaimSinature(operator: any, contract: string, period: bigint,
   const types = {
     "ConfirmShare":[
       {name: "period", type: "uint128"},
+      {name: "txHash", type: "bytes32"},
       {name: "user", type: "address"},
       {name: "sharesAmount", type: "uint256"},
-      {name: "nonce", type: "uint256"},
     ]
   };
 
   const values = {
     period,
+    txHash,
     user,
     sharesAmount,
-    nonce,
   };
 
   const signature = await operator.signTypedData(domain, types, values);
@@ -140,9 +140,8 @@ it("work flow", async function () {
     // 尚未确定份额，所以为0
     expect(await susd1Vault.balanceOf(player1.address)).to.equal(0);
 
-    const confirmNonce = await susd1Vault.confirmNonce(player1.address);
-    const signature = await getClaimSinature(signer1, susd1Vault.target as string, 1n, player1.address, depositAmount, confirmNonce);
-    await susd1Vault.connect(player1).confirmShare(1n, depositAmount, signature);
+    const signature = await getClaimSinature(signer1, susd1Vault.target as string, 1n, player1.address, depositAmount, t.hash);
+    await susd1Vault.connect(player1).confirmShare(1n, t.hash, depositAmount, signature);
 
     // 现在份额为100
     expect(await susd1Vault.balanceOf(player1.address)).to.equal(depositAmount);

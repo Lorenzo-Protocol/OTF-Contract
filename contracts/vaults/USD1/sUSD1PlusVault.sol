@@ -21,9 +21,9 @@ contract sUSD1PlusVault is
     // users deposit usd1 to the vault, and get a pending shares waiting for KYT
     event PendingShares(address indexed user, uint128 indexed period, uint256 shares);
     // users confirm the shares after KYT passed
-    event ConfirmShares (address indexed user, uint128 indexed period, uint256 shares);
+    event ConfirmShares (address indexed user, bytes32 indexed txHash, uint128 indexed period, uint256 shares);
     // users refund the shares after KYT failed
-    event RefundShares  (address indexed user, uint128 indexed period, uint256 shares);
+    event RefundShares  (address indexed user, bytes32 indexed txHash, uint128 indexed period, uint256 shares);
     // usd1 plus vault set
     event Usd1PlusVaultSet(address indexed usd1PlusVault);
     // swap usd1+ to susd1
@@ -31,13 +31,13 @@ contract sUSD1PlusVault is
     // swap susd1 to usd1+
     event SwapSusd1ToUsd1Plus(address indexed from, address indexed to, uint256 sharesAmount);
 
-    bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
-    bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,address user,uint256 sharesAmount,uint256 nonce)");
+    bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
+    bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
 
     mapping(address => mapping(uint128 => uint256)) public pendingShares; // user -> period -> pending shares
     mapping(address => bool) public signers; // signer -> is signer
-    mapping(address => uint256) public confirmNonce; // user -> confirm nonce
-    mapping(address => uint256) public refundNonce; // user -> refund nonce
+    mapping(bytes32 => bool) public confirmedTx; // txHash -> is confirmed
+    mapping(bytes32 => bool) public refundedTx; // txHash -> is refunded
 
     IUSD1PlusVault public usd1PlusVault;
 
@@ -132,21 +132,23 @@ contract sUSD1PlusVault is
 
     // @dev confirm the shares
     // while the deposit passed KYT, then the user can confirm the shares
-    function confirmShare(uint128 period, uint256 sharesAmount, bytes memory signature) public {
+    function confirmShare(uint128 period, bytes32 txHash, uint256 sharesAmount, bytes memory signature) public {
         require(sharesAmount > 0, "Invalid shares amount");
         require(pendingShares[msg.sender][period] >= sharesAmount, "not enough shares amount");
+        require(!confirmedTx[txHash], "tx already confirmed");
+        require(!refundedTx[txHash], "tx already refunded");
 
         // verify the signature
         bytes32 hash = _hashTypedDataV4(keccak256(abi.encode(
             CONFIRM_SHARE,
             period,
+            txHash,
             msg.sender,
-            sharesAmount,
-            confirmNonce[msg.sender]
+            sharesAmount
         )));
         address signer = ECDSA.recover(hash, signature);
         require(signers[signer], "Invalid signer");
-        confirmNonce[msg.sender]++;
+        confirmedTx[txHash] = true;
 
         // sub the pending shares
         pendingShares[msg.sender][period] -= sharesAmount;
@@ -155,30 +157,32 @@ contract sUSD1PlusVault is
         _mint(msg.sender, sharesAmount);
 
         // emit the event
-        emit ConfirmShares(msg.sender, period, sharesAmount);
+        emit ConfirmShares(msg.sender, txHash, period, sharesAmount);
     }
     // @dev refund the shares
     // if the deposit failed KYT, then the user can refund the shares
     // just burn the shares, the underlying asset will be returned to the user by Ceffu automatically
-    function refundShare(uint128 period, uint256 sharesAmount, bytes memory signature) public {
+    function refundShare(uint128 period, bytes32 txHash, uint256 sharesAmount, bytes memory signature) public {
         require(pendingShares[msg.sender][period] >= sharesAmount, "not enough shares amount");
+        require(!refundedTx[txHash], "tx already refunded");
+        require(!confirmedTx[txHash], "tx already confirmed");
 
         // verify the signature
         bytes32 hash = _hashTypedDataV4(keccak256(abi.encode(
             REFUND_SHARE,
             period,
+            txHash,
             msg.sender,
-            sharesAmount,
-            refundNonce[msg.sender]
+            sharesAmount
         )));
         address signer = ECDSA.recover(hash, signature);
         require(signers[signer], "Invalid signer");
-        refundNonce[msg.sender]++;
+        refundedTx[txHash] = true;
         // sub the pending shares
         pendingShares[msg.sender][period] -= sharesAmount;
 
         // emit the event
-        emit RefundShares(msg.sender, period, sharesAmount);
+        emit RefundShares(msg.sender, txHash, period, sharesAmount);
     }
 
     // @dev swap usd1+ to susd1
