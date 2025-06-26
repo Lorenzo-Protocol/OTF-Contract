@@ -24,6 +24,12 @@ const config: HardhatUserConfig = {
       }
     }
   },
+  etherscan: {
+    apiKey: {
+      bsc: '***REMOVED***',
+      bscTestnet: '***REMOVED***',
+    }
+  },
   networks: {
     hardhat: {
       chainId: 1337,

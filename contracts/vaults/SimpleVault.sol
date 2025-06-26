@@ -45,7 +45,7 @@ contract SimpleVault is
     receive() external payable {}
 
     // to handle the depoisted underlying asset
-    function onDepositUnderlying(address from, uint256 underlyingAmount)
+    function onDepositUnderlying(address from, address underlyingToken, uint256 underlyingAmount)
         internal
         override
         returns (uint256 sharesAmount, uint256 unitNav)
@@ -53,9 +53,12 @@ contract SimpleVault is
         if (underlying == NATIVE_TOKEN) {
             require(msg.value == underlyingAmount, "send value != deposit amount");
         } else {
-            IERC20 underlyingToken = IERC20(underlying);
-            SafeERC20.safeTransferFrom(underlyingToken, from, address(this), underlyingAmount);
+            IERC20 assetToken = IERC20(underlyingToken);
+            SafeERC20.safeTransferFrom(assetToken, from, address(this), underlyingAmount);
         }
+
+        uint256 alignedAmount = alignDepositAmount(underlyingAmount, underlyingToken);
+        require(alignedAmount >= minDepositAmount, "deposit amount too small");
 
         address[] memory portfolios = _portfolios.values();
         uint256 len = portfolios.length;
@@ -63,18 +66,18 @@ contract SimpleVault is
         for (uint256 i; i < len;) {
             address portfolio = portfolios[i];
             uint256 weight = portfolioWeights[portfolio];
-            uint256 splitUnderlying = (underlyingAmount * weight) / Precision;
+            uint256 splitUnderlying = (alignedAmount * weight) / Precision;
 
             sendUnderlying(portfolio, splitUnderlying);
             totalTransferred += splitUnderlying;
             unchecked { i++; }
         }
 
-        if (totalTransferred < underlyingAmount) {
-            sendUnderlying(portfolios[0], underlyingAmount - totalTransferred);
+        if (totalTransferred < alignedAmount) {
+            sendUnderlying(portfolios[0], alignedAmount - totalTransferred);
         }
         // mint all the shares to depositor
-        (sharesAmount, unitNav) = mintShares(from, underlyingAmount);
+        (sharesAmount, unitNav) = mintShares(from, alignedAmount);
     }
     // to handle the withdrawed underlying asset
     function onWithdrawUnderlying(address to, uint256 underlyingAmount)

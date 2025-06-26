@@ -102,19 +102,22 @@ contract sUSD1PlusVault is
     }
 
     // to handle the depoisted underlying asset
-    function onDepositUnderlying(address from, uint256 underlyingAmount)
+    function onDepositUnderlying(address from, address underlyingToken, uint256 underlyingAmount)
         internal
         override
         returns (uint256 sharesAmount, uint256 unitNav)
     {
         // transfer the underlying asset to the ceff wallet
         address ceffWallet = _portfolios.at(0);
-        IERC20 underlyingToken = IERC20(underlying);
-        SafeERC20.safeTransferFrom(underlyingToken, from, ceffWallet, underlyingAmount);
+        IERC20 assetToken = IERC20(underlyingToken);
+        SafeERC20.safeTransferFrom(assetToken, from, ceffWallet, underlyingAmount);
+
+        uint256 alignedAmount = alignDepositAmount(underlyingAmount, underlyingToken);
+        require(alignedAmount >= minDepositAmount, "deposit amount too small");
 
         // calculate the shares amount
         unitNav = getUnitNav(settlementPeriod);
-        sharesAmount = underlyingAmount * Precision / unitNav;
+        sharesAmount = alignedAmount * Precision / unitNav;
 
         // calculate the pending shares
         pendingShares[from][settlementPeriod] += sharesAmount;

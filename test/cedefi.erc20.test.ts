@@ -109,7 +109,7 @@ it("create Vault", async function () {
     await BBTC.connect(player1).approve(finBTCVault.target, ethers.parseEther("1000"));
 
     const depositAmount = ethers.parseEther("100");
-    let t = await finBTCVault.connect(player1).deposit(depositAmount);
+    let t = await finBTCVault.connect(player1).deposit(BBTC.target, depositAmount);
     await t.wait();
 
     const pp1Balance = await BBTC.balanceOf(portfolio1.address);

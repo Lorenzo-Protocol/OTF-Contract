@@ -52,7 +52,7 @@ it("create Vault", async function () {
     const hgBNBVault = await ethers.getContractAt("SimpleVault", vaultAddress);
 
     const depositAmount = ethers.parseEther("1.0");
-    let t = await hgBNBVault.connect(player1).deposit(depositAmount, {value: depositAmount});
+    let t = await hgBNBVault.connect(player1).deposit(NATIVE_TOKEN, depositAmount, {value: depositAmount});
     await t.wait();
 
     const pp1Balance = await ethers.provider.getBalance(portfolio1.address);

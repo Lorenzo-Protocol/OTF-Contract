@@ -10,6 +10,12 @@ export async function preDeploy() {
   const USD1 = await ethers.deployContract("TestToken", ["Test USD1", "USD1"]);
   await USD1.waitForDeployment();
 
+  const USDT = await ethers.deployContract("TestToken", ["Test USDT", "USDT"]);
+  await USDT.waitForDeployment();
+
+  const USDC = await ethers.deployContract("TestToken", ["Test USDC", "USDC"]);
+  await USDC.waitForDeployment();
+
   const ManagerImpl = await ethers.deployContract("CeDeFiManager");
   await ManagerImpl.waitForDeployment();
 
@@ -40,5 +46,5 @@ export async function preDeploy() {
     Vault.getFunction('unpause')!.selector,
   ], [true, true, true, true, true, true, true, true, true, true, true]);
 
-  return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, portfolio1, portfolio2, portfolio3};
+  return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, USDT, USDC, portfolio1, portfolio2, portfolio3};
 }

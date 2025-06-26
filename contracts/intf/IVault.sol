@@ -14,6 +14,7 @@ enum YieldType {
 interface IVault is IERC20 {
     event Deposited(
         address indexed sender,
+        address indexed underlyingToken,
         uint256 amount,
         uint256 shares,
         uint256 unitNav,
@@ -40,7 +41,7 @@ interface IVault is IERC20 {
 
     event UpdatePortfolio(address[] portfolios, uint256[] weights);
 
-    function deposit(uint256 amount) external payable;
+    function deposit(address underlyingToken, uint256 amount) external payable;
     function requestWithdraw(uint256 amount) external returns(uint128 reqeustId);
     function withdraw(uint128 requestId) external;
     function getYieldType() external view returns (YieldType);

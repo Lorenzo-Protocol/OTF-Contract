@@ -59,6 +59,7 @@ contract VaultBase {
     mapping(address => EnumerableSet.UintSet) internal _withdrawRequestIds; // withdraw request ids
     mapping(address user => mapping(uint128 settlementPeriod => WithdrewRequest)) public withdrewRequests; // user -> settlementPeriod -> withdrew request
 
+    mapping(address => bool) public acceptUnderlying; // accept underlying assets, such as underlying is USD1, and also support USDT, USDC, etc.
     // @dev padding for future upgrade
     uint256[256] private _gap;
 }

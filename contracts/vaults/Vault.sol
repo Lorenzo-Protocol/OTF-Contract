@@ -33,10 +33,11 @@ abstract contract Vault is
     event SetMinWithdrawAmount(uint256 amount);
     event UpdatePortfolios(address[] portfolios, uint256[] weights);
     event SetTransferable(bool transferable);
+    event SetAcceptUnderlying(address[] underlyingTokens, bool[] accepts);
 
     // @dev while users deposit underlying asset, how to allocate the asset to different portfolios,
     //  for different yield type vault, it should be implemented by different way
-    function onDepositUnderlying(address from, uint256 underlyingAmount) internal virtual returns (uint256 sharesAmount, uint256 unitNav);
+    function onDepositUnderlying(address from, address underlyingToken, uint256 underlyingAmount) internal virtual returns (uint256 sharesAmount, uint256 unitNav);
     // @dev while users withdraw underlying asset, how to withdraw the asset from different portfolios,
     //    implement by different way for different yield type vault
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
@@ -148,6 +149,18 @@ abstract contract Vault is
         _unpause();
     }
 
+    // @dev set the accept underlying token
+    function setAcceptUnderlying(address[] calldata underlyingTokens, bool[] calldata accepts) external onlyManager {
+        uint256 len = underlyingTokens.length;
+        require(len == accepts.length, "length mismatch");
+        for (uint256 i; i < len; ) {
+            acceptUnderlying[underlyingTokens[i]] = accepts[i];
+            unchecked { i++; }
+        }
+
+        emit SetAcceptUnderlying(underlyingTokens, accepts);
+    }
+
     // @dev transfer from/to underlying token
     function sendUnderlying(address to, uint256 underlyingAmount) internal {
         if (underlying == NATIVE_TOKEN) {
@@ -233,23 +246,43 @@ abstract contract Vault is
         return shares;
     }
 
+    // @dev align the deposit amount decimals to the underlying token decimals
+    function alignDepositAmount(uint256 rawAmount, address underlyingToken)
+        internal
+        view
+        returns(uint256)
+    {
+        if (underlyingToken == NATIVE_TOKEN || underlyingToken == underlying) {
+            return rawAmount;
+        }
+
+        uint256 decimals = IERC20Metadata(underlyingToken).decimals();
+        uint256 targetDecimals = IERC20Metadata(underlying).decimals();
+        if (decimals > targetDecimals) {
+            return rawAmount / 10 ** (decimals - targetDecimals);
+        } else {
+            return rawAmount * 10 ** (targetDecimals - decimals);
+        }
+    }
+
     // @dev deposit underlying asset to the vault, mint shares to the target address
-    function deposit(uint256 underlyingAmount)
+    function deposit(address underlyingToken, uint256 underlyingAmount)
         external
         whenNotPaused
         notBlacklisted
         lock
         payable
     {
-        require(underlyingAmount >= minDepositAmount, "deposit amount too small");
+        require(acceptUnderlying[underlyingToken] || underlyingToken == underlying || underlyingToken == NATIVE_TOKEN, "not accept underlying");
 
-        (uint256 sharesAmount, uint256 unitNav) = onDepositUnderlying(msg.sender, underlyingAmount);
+        (uint256 sharesAmount, uint256 unitNav) = onDepositUnderlying(msg.sender, underlyingToken, underlyingAmount);
 
         // emit enough information for accounting
         address[] memory p = portfolios();
         uint256[] memory w = weights();
         emit Deposited(
             msg.sender,
+            underlyingToken,
             underlyingAmount,
             sharesAmount,
             unitNav,
