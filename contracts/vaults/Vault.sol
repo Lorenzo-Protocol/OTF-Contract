@@ -41,6 +41,10 @@ abstract contract Vault is
     // @dev while users withdraw underlying asset, how to withdraw the asset from different portfolios,
     //    implement by different way for different yield type vault
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
+    // @dev to check wether the user can request withdraw the shares or not
+    function onRequestWithdrawShares(address from, uint256 useableShares, uint256 requestShares) internal view virtual {
+        // to check the condition
+    }
 
     function updatePortfolios(address[] memory  portfolios_, uint256[] memory weights_) public onlyManager {
         uint256 totalWeight;
@@ -308,6 +312,8 @@ abstract contract Vault is
             require(shareAmount >= minWithdrawAmount, "withdraw amount too small");
         }
         require(sharesBalance >= shareAmount, "Insufficient balance");
+
+        onRequestWithdrawShares(msg.sender, sharesBalance, shareAmount);
 
         // to record the request information, merge multiple requests into one request
         uint128 requestId = settlementPeriod;
