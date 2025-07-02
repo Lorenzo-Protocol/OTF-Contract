@@ -230,4 +230,22 @@ contract sUSD1PlusVault is
 
         emit SwapSusd1ToUsd1Plus(msg.sender, receiver, sharesAmount);
     }
+
+    // @dev get the details of the balance
+    struct BalanceDetails {
+        uint256 totalShares;      // total shares of the user
+        uint256 confirmedShares;  // confirmed shares of the user in the current period
+        uint256 freezedShares;    // freezed shares of the user
+        uint256 withdrawingShares; // withdrawing shares of the user
+    }
+    function getBalanceDetails(address user) public view returns (BalanceDetails memory) {
+        BalanceDetails memory details;
+
+        details.totalShares = balanceOf(user);
+        details.confirmedShares = confirmedShares[user][settlementPeriod];
+        details.freezedShares = freezedShares[user];
+        details.withdrawingShares = getOngoingWithdrawShares(user);
+
+        return details;
+    }
 }
