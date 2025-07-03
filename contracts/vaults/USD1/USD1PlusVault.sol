@@ -29,7 +29,7 @@ contract USD1PlusVault is
 
     IsUSD1PlusVault public susd1Vault;
 
-    mapping(address => uint256) public freezedShares;
+    mapping(address => uint256) public frozenShares;
 // ------------------------------------------
     modifier onlyVault() {
         require(msg.sender == address(susd1Vault), "only vault can call");
@@ -135,7 +135,7 @@ contract USD1PlusVault is
 
     // @dev calculate the useable shares amount
     function getUseableShares(address account) public view returns (uint256) {
-        return super.balanceOf(account) - freezedShares[account];
+        return super.balanceOf(account) - frozenShares[account];
     }
 
     // @dev freeze the shares of the target address
@@ -144,7 +144,7 @@ contract USD1PlusVault is
         uint256 sharesAmount = convertToShares(onePlusAmount);
         require(sharesAmount <= getUseableShares(account), "can not freeze so much shares");
 
-        freezedShares[account] += sharesAmount;
+        frozenShares[account] += sharesAmount;
 
         emit Freeze(account, sharesAmount);
     }
@@ -152,9 +152,9 @@ contract USD1PlusVault is
     // @dev unfreeze the shares of the target address
     function unfreeze(address account, uint256 sharesAmount) public onlyRole(FREEZER_ROLE) {
         require(sharesAmount > 0, "shares amount is zero");
-        require(freezedShares[account] >= sharesAmount, "can not unfreeze so much shares");
+        require(frozenShares[account] >= sharesAmount, "can not unfreeze so much shares");
 
-        freezedShares[account] -= sharesAmount;
+        frozenShares[account] -= sharesAmount;
 
         emit Unfreeze(account, sharesAmount);
     }

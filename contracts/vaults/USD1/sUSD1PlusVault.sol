@@ -139,17 +139,6 @@ contract sUSD1PlusVault is
         sendUnderlying(to, underlyingAmount);
     }
 
-    // @dev to check wether the user can request withdraw the shares or not
-    function onRequestWithdrawShares(address from, uint256 useableShares, uint256 requestShares) internal view override {
-        // require  useableShares - confirmedShares[from][settlementPeriod] >= sharesAmount
-        // because the user can not request withdraw the confirmed shares in the same period,
-        // the confirmed shares must stay in the vault for at least next period
-        require(
-            useableShares >= confirmedShares[from][settlementPeriod] + requestShares,
-            "not enough shares to withdraw in this period"
-        );
-    }
-
     // @dev confirm the shares
     // while the deposit passed KYT, then the user can confirm the shares
     function confirmShare(uint128 period, bytes32 txHash, uint256 sharesAmount, bytes memory signature) public {
@@ -234,16 +223,14 @@ contract sUSD1PlusVault is
     // @dev get the details of the balance
     struct BalanceDetails {
         uint256 totalShares;      // total shares of the user
-        uint256 confirmedShares;  // confirmed shares of the user in the current period
-        uint256 freezedShares;    // freezed shares of the user
+        uint256 frozenShares;    // frozen shares of the user
         uint256 withdrawingShares; // withdrawing shares of the user
     }
     function getBalanceDetails(address user) public view returns (BalanceDetails memory) {
         BalanceDetails memory details;
 
         details.totalShares = balanceOf(user);
-        details.confirmedShares = confirmedShares[user][settlementPeriod];
-        details.freezedShares = freezedShares[user];
+        details.frozenShares = frozenShares[user];
         details.withdrawingShares = getOngoingWithdrawShares(user);
 
         return details;

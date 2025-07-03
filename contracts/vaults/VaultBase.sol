@@ -44,7 +44,7 @@ contract VaultBase {
     bool private _locked; // locked entrance
     bool public transferable; // the shares are transferable or not
     mapping(address => bool) public blacklisted; // blacklisted users
-    mapping(address => uint256) public freezedShares;   // freezed shares
+    mapping(address => uint256) public frozenShares;   // frozen shares
     uint256 public minDepositAmount; // minimum deposit amount
     uint256 public minWithdrawAmount; // maximum withdraw amount
 

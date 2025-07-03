@@ -41,10 +41,6 @@ abstract contract Vault is
     // @dev while users withdraw underlying asset, how to withdraw the asset from different portfolios,
     //    implement by different way for different yield type vault
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
-    // @dev to check wether the user can request withdraw the shares or not
-    function onRequestWithdrawShares(address from, uint256 useableShares, uint256 requestShares) internal view virtual {
-        // to check the condition
-    }
 
     function updatePortfolios(address[] memory  portfolios_, uint256[] memory weights_) public onlyManager {
         uint256 totalWeight;
@@ -128,18 +124,18 @@ abstract contract Vault is
             shares = leftShares;
         }
 
-        freezedShares[account] += shares;
+        frozenShares[account] += shares;
         emit FreezeShares(account, shares);
     }
 
     // @dev unfreeze the shares of the target address
     function unfreezeShares(address account, uint256 shares) external onlyManager {
-        uint256 freezed = freezedShares[account];
+        uint256 freezed = frozenShares[account];
         if (shares > freezed) {
             shares = freezed;
         }
 
-        freezedShares[account] -= shares;
+        frozenShares[account] -= shares;
         emit UnfreezeShares(account, shares);
     }
 
@@ -154,6 +150,7 @@ abstract contract Vault is
     }
 
     // @dev set the accept underlying token
+    // these tokens can deposit to the vault, but while withdraw, only the underlying token provide
     function setAcceptUnderlying(address[] calldata underlyingTokens, bool[] calldata accepts) external onlyManager {
         uint256 len = underlyingTokens.length;
         require(len == accepts.length, "length mismatch");
@@ -228,7 +225,7 @@ abstract contract Vault is
     // @dev get usable shares of the target address
     function getUsableShares(address account) public view returns(uint256) {
         uint256 rawBalance = balanceOf(account);
-        uint256 freezed = freezedShares[account];
+        uint256 freezed = frozenShares[account];
         uint256 ongoingWithdrawShares = getOngoingWithdrawShares(account);
         // it must be but just check it
         return rawBalance > (freezed + ongoingWithdrawShares) ?
@@ -313,8 +310,6 @@ abstract contract Vault is
         }
         require(sharesBalance >= shareAmount, "Insufficient balance");
 
-        onRequestWithdrawShares(msg.sender, sharesBalance, shareAmount);
-
         // to record the request information, merge multiple requests into one request
         uint128 requestId = settlementPeriod;
         _withdrawRequestIds[msg.sender].add(requestId);
@@ -338,8 +333,8 @@ abstract contract Vault is
     }
 
     // @dev withdraw underlying asset from the vault, burn shares from the target address
-    //    only executalbe while the period is settled
-    //    the requestId must be call `requestWithdraw` to get
+    //    only executalbe more than two periods are settled
+    //    the requestId is the return value of method `requestWithdraw`
     function withdraw(uint128 requestId)
         public
         virtual
@@ -347,7 +342,8 @@ abstract contract Vault is
         notBlacklisted
         lock
     {
-        require(requestId < settlementPeriod, "not settled yet");
+        uint128 settledPeriod = requestId + 1;
+        require(settledPeriod < settlementPeriod, "should wait more than two periods");
 
         require(_withdrawRequestIds[msg.sender].contains(requestId), "not requested");
         _withdrawRequestIds[msg.sender].remove(requestId);
@@ -360,14 +356,14 @@ abstract contract Vault is
 
         unsettledWithdrawShares -= request.requestShares;
 
-        uint256 underlyingAmount = burnShares(msg.sender, requestId, request.requestShares);
+        uint256 underlyingAmount = burnShares(msg.sender, settledPeriod, request.requestShares);
         onWithdrawUnderlying(msg.sender, underlyingAmount);
 
         emit WithdrawFinished(
             requestId,
             msg.sender,
             request.requestShares,
-            periodUnitNav[requestId],
+            periodUnitNav[settledPeriod],
             block.timestamp
         );
     }
@@ -386,8 +382,8 @@ abstract contract Vault is
     // @dev burn shares from the target address, it should be calculated as : amount = shares * unitNav
     // @param from the target address
     // @param shares the amount of shares
-    function burnShares(address from, uint128 requestId, uint256 sharesAmount) internal returns(uint256) {
-        uint256 unitNav = periodUnitNav[requestId];
+    function burnShares(address from, uint128 settledPeriod, uint256 sharesAmount) internal returns(uint256) {
+        uint256 unitNav = periodUnitNav[settledPeriod];
         uint256 amount = (sharesAmount * unitNav) / Precision;
         // burn shares and return the amount of underlying asset
         _burn(from, sharesAmount);
