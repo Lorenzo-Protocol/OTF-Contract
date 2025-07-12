@@ -168,12 +168,12 @@ contract USD1PlusVault is
 
     // @dev redeem USD1+ to the target address
     // users call the `susd1Vault.swapBack` to exchange USD1+ to sUSD1
-    function redeem(address to, uint256 onePlusAmount) public {
+    function redeem(uint256 onePlusAmount) public {
         uint256 sharesAmount = convertToShares(onePlusAmount);
         _burn(msg.sender, sharesAmount);
 
-        susd1Vault.swapToSusd1(to, sharesAmount);
+        susd1Vault.swapToSusd1(msg.sender, sharesAmount);
 
-        emit RedeemUsd1Plus(to, onePlusAmount);
+        emit RedeemUsd1Plus(msg.sender, onePlusAmount);
     }
 }

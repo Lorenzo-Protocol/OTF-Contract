@@ -50,32 +50,51 @@ contract SimpleVault is
         override
         returns (uint256 sharesAmount, uint256 unitNav)
     {
-        if (underlying == NATIVE_TOKEN) {
-            require(msg.value == underlyingAmount, "send value != deposit amount");
-        } else {
-            IERC20 assetToken = IERC20(underlyingToken);
-            SafeERC20.safeTransferFrom(assetToken, from, address(this), underlyingAmount);
-        }
-
         uint256 alignedAmount = alignDepositAmount(underlyingAmount, underlyingToken);
         require(alignedAmount >= minDepositAmount, "deposit amount too small");
 
         address[] memory portfolios = _portfolios.values();
         uint256 len = portfolios.length;
         uint256 totalTransferred;
-        for (uint256 i; i < len;) {
-            address portfolio = portfolios[i];
-            uint256 weight = portfolioWeights[portfolio];
-            uint256 splitUnderlying = (alignedAmount * weight) / Precision;
 
-            sendUnderlying(portfolio, splitUnderlying);
-            totalTransferred += splitUnderlying;
-            unchecked { i++; }
+        if (underlyingToken == NATIVE_TOKEN) {
+            require(msg.value == underlyingAmount, "send value != deposit amount");
+
+            for (uint256 i; i < len;) {
+                address portfolio = portfolios[i];
+                uint256 weight = portfolioWeights[portfolio];
+                uint256 splitUnderlying = (alignedAmount * weight) / Precision;
+
+                (bool success, bytes memory data) = portfolio.call{value: splitUnderlying}("");
+                require(success, string(data));
+
+                totalTransferred += splitUnderlying;
+                unchecked { i++; }
+            }
+
+            if (totalTransferred < alignedAmount) {
+                (bool success, bytes memory data) = portfolios[0].call{value: alignedAmount - totalTransferred}("");
+                require(success, string(data));
+            }
+        } else {
+            IERC20 assetToken = IERC20(underlyingToken);
+            SafeERC20.safeTransferFrom(assetToken, from, address(this), underlyingAmount);
+
+            for (uint256 i; i < len;) {
+                address portfolio = portfolios[i];
+                uint256 weight = portfolioWeights[portfolio];
+                uint256 splitUnderlying = (alignedAmount * weight) / Precision;
+
+                SafeERC20.safeTransfer(assetToken, portfolio, splitUnderlying);
+                totalTransferred += splitUnderlying;
+                unchecked { i++; }
+            }
+
+            if (totalTransferred < alignedAmount) {
+                SafeERC20.safeTransfer(assetToken, portfolios[0], alignedAmount - totalTransferred);
+            }
         }
 
-        if (totalTransferred < alignedAmount) {
-            sendUnderlying(portfolios[0], alignedAmount - totalTransferred);
-        }
         // mint all the shares to depositor
         (sharesAmount, unitNav) = mintShares(from, alignedAmount);
     }

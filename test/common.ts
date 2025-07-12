@@ -32,7 +32,7 @@ export async function preDeploy() {
   const CeDeFiManager = await ethers.getContractAt('CeDeFiManager', ManagerProxy.target);
   // add support functions
   const Vault =  new ethers.Interface(require(path.join(__dirname, '..', 'artifacts', 'contracts', 'vaults', 'Vault.sol', 'Vault.json')).abi);
-  await CeDeFiManager.connect(admin).addAllowedVaultsFuncs([
+  await CeDeFiManager.connect(admin).setInvokableVaultsFuncs([
     Vault.getFunction('updatePortfolios')!.selector,
     Vault.getFunction('setMinDepositAmount')!.selector,
     Vault.getFunction('setMinWithdrawAmount')!.selector,

@@ -43,6 +43,14 @@ abstract contract Vault is
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
 
     function updatePortfolios(address[] memory  portfolios_, uint256[] memory weights_) public onlyManager {
+        // remove old portfolios
+        address[] memory oldPortfolios = EnumerableSet.values(_portfolios);
+        for (uint256 i = 0; i < oldPortfolios.length; i++) {
+            delete portfolioWeights[oldPortfolios[i]];
+            _portfolios.remove(oldPortfolios[i]);
+        }
+
+        // add new portfolios
         uint256 totalWeight;
         uint256 len = portfolios_.length;
         for (uint256 i = 0; i < len; ) {
@@ -119,7 +127,7 @@ abstract contract Vault is
 
     // @dev freeze the shares of the target address
     function freezeShares(address account, uint256 shares) external onlyManager {
-        uint256 leftShares = balanceOf(account);
+        uint256 leftShares = getUsableShares(account);
         if (shares > leftShares) {
             shares = leftShares;
         }
@@ -261,6 +269,8 @@ abstract contract Vault is
         uint256 targetDecimals = IERC20Metadata(underlying).decimals();
         if (decimals > targetDecimals) {
             return rawAmount / 10 ** (decimals - targetDecimals);
+        } else if (decimals == targetDecimals) {
+            return rawAmount;
         } else {
             return rawAmount * 10 ** (targetDecimals - decimals);
         }

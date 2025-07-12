@@ -149,6 +149,8 @@ it("create Vault", async function () {
     // rebalance underlying asset offline
     await BBTC.mint(finBTCVault.target, ethers.parseEther("100"));
 
+    await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setUnitNavData);
+
     // withdraw
     const p1balanceBefore = await BBTC.balanceOf(player1.address);
     const p1finBtcBalanceBefore = await finBTCVault.balanceOf(player1.address);

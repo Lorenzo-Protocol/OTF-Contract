@@ -9,8 +9,6 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {IVault, YieldType} from "./intf/IVault.sol";
 import {CeDeFiManagerBase} from "./CeDeFiManagerBase.sol";
 
-import "hardhat/console.sol";
-
 contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManagerBase {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -59,8 +57,14 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
         emit DeletePortfolios(portfolios);
     }
 
-    // @dev add allowed vaults functions
-    function addAllowedVaultsFuncs(bytes4[] memory funcSelectors, bool[] memory isAllowed) public onlyRole(ADMIN_ROLE) {
+    // @dev add or removeallowed vaults functions, which CeDeFiManager can call.
+    function setInvokableVaultsFuncs(
+        bytes4[] memory funcSelectors,
+        bool[] memory isAllowed
+    )
+        public
+        onlyRole(ADMIN_ROLE)
+    {
         require(funcSelectors.length == isAllowed.length, "CeDeFiManager: mismatched length");
 
         uint256 len = funcSelectors.length;

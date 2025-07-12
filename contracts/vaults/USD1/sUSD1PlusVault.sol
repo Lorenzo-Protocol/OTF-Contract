@@ -29,7 +29,7 @@ contract sUSD1PlusVault is
     // swap usd1+ to susd1
     event SwapUsd1PlusToSusd1(address indexed user, uint256 sharesAmount);
     // swap susd1 to usd1+
-    event SwapSusd1ToUsd1Plus(address indexed from, address indexed to, uint256 sharesAmount);
+    event SwapSusd1ToUsd1Plus(address indexed user, uint256 sharesAmount);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
@@ -103,6 +103,7 @@ contract sUSD1PlusVault is
         require(signers_.length == isSigners_.length, "mismatch length of signers");
 
         for (uint256 i = 0; i < signers_.length; i++) {
+            require(signers_[i] != address(0), "zero signer");
             signers[signers_[i]] = isSigners_[i];
         }
     }
@@ -141,7 +142,15 @@ contract sUSD1PlusVault is
 
     // @dev confirm the shares
     // while the deposit passed KYT, then the user can confirm the shares
-    function confirmShare(uint128 period, bytes32 txHash, uint256 sharesAmount, bytes memory signature) public {
+    function confirmShare(
+        uint128 period,
+        bytes32 txHash,
+        uint256 sharesAmount,
+        bytes memory signature
+    )
+        public
+        whenNotPaused
+    {
         require(sharesAmount > 0, "Invalid shares amount");
         require(pendingShares[msg.sender][period] >= sharesAmount, "not enough shares amount");
         require(!confirmedTx[txHash], "tx already confirmed");
@@ -173,7 +182,15 @@ contract sUSD1PlusVault is
     // @dev refund the shares
     // if the deposit failed KYT, then the user can refund the shares
     // just burn the shares, the underlying asset will be returned to the user by Ceffu automatically
-    function refundShare(uint128 period, bytes32 txHash, uint256 sharesAmount, bytes memory signature) public {
+    function refundShare(
+        uint128 period,
+        bytes32 txHash,
+        uint256 sharesAmount,
+        bytes memory signature
+    )
+        public
+        whenNotPaused
+    {
         require(pendingShares[msg.sender][period] >= sharesAmount, "not enough shares amount");
         require(!refundedTx[txHash], "tx already refunded");
         require(!confirmedTx[txHash], "tx already confirmed");
@@ -198,7 +215,7 @@ contract sUSD1PlusVault is
 
     // @dev swap usd1+ to susd1
     // only usd1 plus vault can call
-    function swapToSusd1(address to, uint256 sharesAmount) public {
+    function swapToSusd1(address to, uint256 sharesAmount) public whenNotPaused {
         require(msg.sender == address(usd1PlusVault), "only usd1 plus vault can call");
 
         _transfer(address(usd1PlusVault), to, sharesAmount);
@@ -207,17 +224,23 @@ contract sUSD1PlusVault is
     }
 
     // @dev swap susd1 to usd1+
-    function swapToUsd1Plus(address receiver, uint256 sharesAmount) public {
-        require(receiver != address(0), "invalid receiver");
+    function swapToUsd1Plus(uint256 sharesAmount)
+        public
+        whenNotPaused
+        notBlacklisted
+    {
         require(sharesAmount > 0, "invalid shares amount");
+
+        uint256 usableShares = getUsableShares(msg.sender);
+        require(sharesAmount <= usableShares, "insufficient usableshares amount");
 
         // lock the shares
         _transfer(msg.sender, address(usd1PlusVault), sharesAmount);
 
         // mint the shares to the receiver
-        usd1PlusVault.mint(receiver, sharesAmount);
+        usd1PlusVault.mint(msg.sender, sharesAmount);
 
-        emit SwapSusd1ToUsd1Plus(msg.sender, receiver, sharesAmount);
+        emit SwapSusd1ToUsd1Plus(msg.sender, sharesAmount);
     }
 
     // @dev get the details of the balance

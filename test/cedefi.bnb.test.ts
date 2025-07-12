@@ -88,6 +88,8 @@ it("create Vault", async function () {
     const totalhgBNB = await hgBNBVault.totalSupply();
     expect(totalhgBNB).to.equal(rawTotalhgBNB - withdrawSharesAmount);
     expect(2n).to.equal(await hgBNBVault.settlementPeriod());
+    // set unit nav again
+    await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setUnitNavData);
 
     // withdraw
     // rebalance the widrawing balance to vault

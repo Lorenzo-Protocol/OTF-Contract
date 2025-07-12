@@ -75,6 +75,7 @@ const config: HardhatUserConfig = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     bsctest: {
+      // url: 'https://methodical-ancient-road.bsc-testnet.quiknode.pro/***REMOVED***/',
       url: 'https://bsc-testnet.public.blastapi.io',
       accounts: [process.env.BSC_TESTNET_KEY!]
     },
