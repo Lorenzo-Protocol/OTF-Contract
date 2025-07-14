@@ -81,7 +81,7 @@ const config: HardhatUserConfig = {
     },
     bsc: {
       url: "https://bsc-rpc.publicnode.com",
-      accounts
+      accounts: [process.env.BSC_MAINNET_KEY!]
     },
     base: {
       // url: "https://mainnet.base.org",

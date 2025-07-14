@@ -18,14 +18,17 @@ contract USD1PlusVault is
     AccessControlUpgradeable
 {
     uint256 public constant PRECISION = 1e18;
-    bytes32 public constant OWNER_ROLE = keccak256("VAULT_ROLE");
-    bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+    bytes32 public constant OP_ROLE = keccak256("OP_ROLE");
 
     event MintUsd1Plus(address indexed to, uint256 sharesAmount);
     event RedeemUsd1Plus(address indexed to, uint256 sharesAmount);
     event Usd1VaultSet(address indexed susd1Vault);
     event Freeze(address indexed account, uint256 sharesAmount);
     event Unfreeze(address indexed account, uint256 sharesAmount);
+
+    event SpecialMint(address indexed to, uint256 sharesAmount);
+    event SpecialBurn(address indexed from, uint256 sharesAmount);
 
     IsUSD1PlusVault public susd1Vault;
 
@@ -52,13 +55,13 @@ contract USD1PlusVault is
         __AccessControl_init();
 
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
-        _setRoleAdmin(FREEZER_ROLE, OWNER_ROLE);
+        _setRoleAdmin(OP_ROLE, OWNER_ROLE);
 
         _grantRole(OWNER_ROLE, _owner);
-        _grantRole(FREEZER_ROLE, _owner);
+        _grantRole(OP_ROLE, _owner);
 
         for (uint256 i; i < _freezers.length; i++) {
-            _grantRole(FREEZER_ROLE, _freezers[i]);
+            _grantRole(OP_ROLE, _freezers[i]);
         }
         susd1Vault = IsUSD1PlusVault(_susd1Vault);
     }
@@ -139,7 +142,7 @@ contract USD1PlusVault is
     }
 
     // @dev freeze the shares of the target address
-    function freeze(address account, uint256 onePlusAmount) public onlyRole(FREEZER_ROLE) {
+    function freeze(address account, uint256 onePlusAmount) public onlyRole(OP_ROLE) {
         require(onePlusAmount > 0, "invalid onePlusAmount");
         uint256 sharesAmount = convertToShares(onePlusAmount);
         require(sharesAmount <= getUseableShares(account), "can not freeze so much shares");
@@ -150,7 +153,7 @@ contract USD1PlusVault is
     }
 
     // @dev unfreeze the shares of the target address
-    function unfreeze(address account, uint256 sharesAmount) public onlyRole(FREEZER_ROLE) {
+    function unfreeze(address account, uint256 sharesAmount) public onlyRole(OP_ROLE) {
         require(sharesAmount > 0, "shares amount is zero");
         require(frozenShares[account] >= sharesAmount, "can not unfreeze so much shares");
 
@@ -175,5 +178,26 @@ contract USD1PlusVault is
         susd1Vault.swapToSusd1(msg.sender, sharesAmount);
 
         emit RedeemUsd1Plus(msg.sender, onePlusAmount);
+    }
+
+    // @dev special mint by owner
+    function specialMint(address to, uint256 sharesAmount) public onlyRole(OP_ROLE) {
+        require(to != address(0), "invalid to");
+        require(sharesAmount > 0, "invalid shares amount");
+
+        _mint(to, sharesAmount);
+
+        emit SpecialMint(to, sharesAmount);
+    }
+
+    // @dev special redeem by owner
+    function specialBurn(address from, uint256 sharesAmount) public onlyRole(OP_ROLE) {
+        require(from != address(0), "invalid from");
+        require(sharesAmount > 0, "invalid shares amount");
+        require(getUseableShares(from) >= sharesAmount, "can not burn so much shares");
+
+        _burn(from, sharesAmount);
+
+        emit SpecialBurn(from, sharesAmount);
     }
 }
