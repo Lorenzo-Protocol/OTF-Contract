@@ -173,6 +173,9 @@ contract USD1PlusVault is
     // users call the `susd1Vault.swapBack` to exchange USD1+ to sUSD1
     function redeem(uint256 onePlusAmount) public {
         uint256 sharesAmount = convertToShares(onePlusAmount);
+        require(sharesAmount > 0, "invalid shares amount");
+        require(getUseableShares(msg.sender) >= sharesAmount, "can not redeem so much shares");
+
         _burn(msg.sender, sharesAmount);
 
         susd1Vault.swapToSusd1(msg.sender, sharesAmount);

@@ -34,6 +34,7 @@ abstract contract Vault is
     event UpdatePortfolios(address[] portfolios, uint256[] weights);
     event SetTransferable(bool transferable);
     event SetAcceptUnderlying(address[] underlyingTokens, bool[] accepts);
+    event ResetUnitNav(uint128 period, uint256 unitNav);
 
     // @dev while users deposit underlying asset, how to allocate the asset to different portfolios,
     //  for different yield type vault, it should be implemented by different way
@@ -85,6 +86,18 @@ abstract contract Vault is
         ++settlementPeriod;
 
         emit SetUnitNav(index, unitNav);
+    }
+
+    // @dev reset the unit nav of the target period
+    // it only reset the unit nav of the target period, but not change the settlementPeriod
+    // ONLY for mis setting the unit nav of the target period
+    function resetUnitNav(uint128 period, uint256 unitNav) external onlyManager {
+        require(period < settlementPeriod, "period not settled");
+        require(unitNav > 0, "invalid unit nav");
+
+        periodUnitNav[period] = unitNav;
+
+        emit ResetUnitNav(period, unitNav);
     }
 
     // @dev set min deposit amount
@@ -420,7 +433,9 @@ abstract contract Vault is
     // @dev get current unit nav
     // @param period the period to get the unit nav, period should gte 1
     function getUnitNav(uint128 period) public view returns (uint256) {
-        if (period == 1) {
+        if (period == 0) {
+            return 0;
+        } else if (period == 1) {
             if (underlying == NATIVE_TOKEN) {
                 return 10 ** 18;
             } else {

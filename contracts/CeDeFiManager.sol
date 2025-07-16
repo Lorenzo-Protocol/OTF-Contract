@@ -32,7 +32,7 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
         _grantRole(OPERATOR_ROLE, admin);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal view override onlyRole(BOSS_ROLE){
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(BOSS_ROLE){
     }
 
     // @dev add profilios to the systems
@@ -106,7 +106,7 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
             params.name, params.symbol, params.underlying, params.portfolios, params.portfolioWeights, address(this)
         );
 
-        bytes32 salt = keccak256(abi.encodePacked(params.yieldType, params.name, params.symbol, params.underlying));
+        bytes32 salt = keccak256(abi.encode(params.yieldType, params.name, params.symbol, params.underlying));
         address vaultProxy = address(new ERC1967Proxy{salt: salt}(implementation, data));
         require(_vaults.contains(vaultProxy) == false, "CeDeFiManager: vault already exists");
         require(IVault(vaultProxy).getYieldType() == params.yieldType, "CeDeFiManager: vault yield type mismatch");
