@@ -10,8 +10,6 @@ import {IVault, YieldType} from "../intf/IVault.sol";
 import {VaultBase} from "./VaultBase.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "hardhat/console.sol";
-
 abstract contract Vault is
     ERC20Upgradeable,
     PausableUpgradeable,

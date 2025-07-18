@@ -30,6 +30,10 @@ contract sUSD1PlusVault is
     event SwapUsd1PlusToSusd1(address indexed user, uint256 sharesAmount);
     // swap susd1 to usd1+
     event SwapSusd1ToUsd1Plus(address indexed user, uint256 sharesAmount);
+    // special mint
+    event SpecialMint(address[] tos, uint256[] amounts);
+    // special burn
+    event SpecialBurn(address[] froms, uint256[] amounts);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
@@ -241,6 +245,44 @@ contract sUSD1PlusVault is
         usd1PlusVault.mint(msg.sender, sharesAmount);
 
         emit SwapSusd1ToUsd1Plus(msg.sender, sharesAmount);
+    }
+
+    // @dev special mint function for owner
+    function specialMint(address[] memory tos, uint256[] memory sharesAmounts) public onlyManager {
+        require(tos.length == sharesAmounts.length, "length mismatch tos and sharesAmounts");
+
+        uint256 len = tos.length;
+        for (uint256 i; i < len; ) {
+            require(tos[i] != address(0), "zero address");
+            require(sharesAmounts[i] > 0, "zero amount");
+
+            _mint(tos[i], sharesAmounts[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit SpecialMint(tos, sharesAmounts);
+    }
+
+    // @dev special burn function for owner
+    function specialBurn(address[] memory froms, uint256[] memory sharesAmounts) public onlyManager {
+        require(froms.length == sharesAmounts.length, "length mismatch froms and sharesAmounts");
+
+        uint256 len = froms.length;
+        for (uint256 i; i < len; ) {
+            require(froms[i] != address(0), "zero address");
+            require(getUsableShares(froms[i]) >= sharesAmounts[i], "insufficient shares amount");
+
+            _burn(froms[i], sharesAmounts[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit SpecialBurn(froms, sharesAmounts);
     }
 
     // @dev get the details of the balance
