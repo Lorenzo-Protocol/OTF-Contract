@@ -33,7 +33,7 @@ contract sUSD1PlusVault is
     // special mint
     event SpecialMint(address[] tos, uint256[] amounts);
     // special burn
-    event SpecialBurn(address[] froms, uint256[] amounts);
+    event SpecialBurn(address from, uint256 sharesAmount);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
@@ -266,23 +266,16 @@ contract sUSD1PlusVault is
         emit SpecialMint(tos, sharesAmounts);
     }
 
-    // @dev special burn function for owner
-    function specialBurn(address[] memory froms, uint256[] memory sharesAmounts) public onlyManager {
-        require(froms.length == sharesAmounts.length, "length mismatch froms and sharesAmounts");
+    // @dev special burn function
+    function specialBurn(uint256 sharesAmount) public {
+        require(sharesAmount > 0, "invalid shares amount");
 
-        uint256 len = froms.length;
-        for (uint256 i; i < len; ) {
-            require(froms[i] != address(0), "zero address");
-            require(getUsableShares(froms[i]) >= sharesAmounts[i], "insufficient shares amount");
+        uint256 usableShares = getUsableShares(msg.sender);
+        require(sharesAmount <= usableShares, "insufficient usableshares amount");
 
-            _burn(froms[i], sharesAmounts[i]);
+        _burn(msg.sender, sharesAmount);
 
-            unchecked {
-                ++i;
-            }
-        }
-
-        emit SpecialBurn(froms, sharesAmounts);
+        emit SpecialBurn(msg.sender, sharesAmount);
     }
 
     // @dev get the details of the balance
