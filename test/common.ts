@@ -46,5 +46,18 @@ export async function preDeploy() {
     Vault.getFunction('unpause')!.selector,
   ], [true, true, true, true, true, true, true, true, true, true, true]);
 
-  return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, USDT, USDC, portfolio1, portfolio2, portfolio3};
+
+  const MultiSendImpl = await ethers.deployContract("MultiSend");
+  await MultiSendImpl.waitForDeployment();
+
+  const msInitdata = MultiSendImpl.interface.encodeFunctionData(
+    'initialize',
+    [admin.address]
+  );
+  const MultiSendProxy = await ethers.deployContract("ERC1967Proxy", [MultiSendImpl.target, msInitdata]);
+  await MultiSendProxy.waitForDeployment();
+
+  const MultiSend = await ethers.getContractAt("MultiSend", MultiSendProxy.target);
+
+  return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, USDT, USDC, portfolio1, portfolio2, portfolio3, MultiSend};
 }
