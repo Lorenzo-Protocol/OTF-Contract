@@ -42,6 +42,8 @@ abstract contract Vault is
     function onWithdrawUnderlying(address from, uint256 underlyingAmount) internal virtual;
 
     function updatePortfolios(address[] memory  portfolios_, uint256[] memory weights_) public onlyManager {
+        require(portfolios_.length == weights_.length, "mismatch length of portfolios and weights");
+
         // remove old portfolios
         address[] memory oldPortfolios = EnumerableSet.values(_portfolios);
         for (uint256 i = 0; i < oldPortfolios.length; i++) {

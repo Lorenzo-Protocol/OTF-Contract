@@ -118,6 +118,7 @@ contract sUSD1PlusVault is
         override
         returns (uint256 sharesAmount, uint256 unitNav)
     {
+        require(msg.value == 0, "not allowed to deposit native token");
         // transfer the underlying asset to the ceff wallet
         address ceffWallet = _portfolios.at(0);
         IERC20 assetToken = IERC20(underlyingToken);

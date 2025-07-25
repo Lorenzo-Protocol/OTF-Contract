@@ -52,6 +52,7 @@ contract USD1PlusVault is
         require(_susd1Vault != address(0), "invalid usd1 vault");
 
         __ERC20_init("Lorenzo USD1+", "USD1+");
+        __UUPSUpgradeable_init();
         __AccessControl_init();
 
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
