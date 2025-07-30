@@ -274,12 +274,13 @@ abstract contract Vault is
         view
         returns(uint256)
     {
-        if (underlyingToken == NATIVE_TOKEN || underlyingToken == underlying) {
+        if (underlyingToken == underlying) {
             return rawAmount;
         }
 
-        uint256 decimals = IERC20Metadata(underlyingToken).decimals();
-        uint256 targetDecimals = IERC20Metadata(underlying).decimals();
+        uint256 decimals = underlyingToken == NATIVE_TOKEN ? 18 : IERC20Metadata(underlyingToken).decimals();
+        uint256 targetDecimals = underlying == NATIVE_TOKEN ? 18 : IERC20Metadata(underlying).decimals();
+
         if (decimals > targetDecimals) {
             return rawAmount / 10 ** (decimals - targetDecimals);
         } else if (decimals == targetDecimals) {

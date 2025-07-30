@@ -183,25 +183,4 @@ contract USD1PlusVault is
 
         emit RedeemUsd1Plus(msg.sender, onePlusAmount);
     }
-
-    // @dev special mint by owner
-    function specialMint(address to, uint256 sharesAmount) public onlyRole(OP_ROLE) {
-        require(to != address(0), "invalid to");
-        require(sharesAmount > 0, "invalid shares amount");
-
-        _mint(to, sharesAmount);
-
-        emit SpecialMint(to, sharesAmount);
-    }
-
-    // @dev special redeem by owner
-    function specialBurn(address from, uint256 sharesAmount) public onlyRole(OP_ROLE) {
-        require(from != address(0), "invalid from");
-        require(sharesAmount > 0, "invalid shares amount");
-        require(getUseableShares(from) >= sharesAmount, "can not burn so much shares");
-
-        _burn(from, sharesAmount);
-
-        emit SpecialBurn(from, sharesAmount);
-    }
 }
