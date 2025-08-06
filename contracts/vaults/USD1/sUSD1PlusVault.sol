@@ -294,4 +294,10 @@ contract sUSD1PlusVault is
 
         return details;
     }
+
+    // @dev get current unit nav
+    // @param period the period to get the unit nav, period should gte 1
+    function getCurrentUnitNav() public view returns (uint256) {
+        return getUnitNav(settlementPeriod);
+    }
 }
