@@ -22,28 +22,24 @@ contract SimpleVault is
     function initialize(
         string calldata name_,
         string calldata symbol_,
-        address underlying_,
-        address[] calldata portfolios_,
-        uint256[] calldata weights_,
         address cedefiManager_
     ) public initializer {
-        require(underlying_ != address(0), "Invalid underlying");
-        require(portfolios_.length == weights_.length, "Invalid portfolios or weights");
 
         __UUPSUpgradeable_init();
         __ERC20_init(name_, symbol_);
 
         cedefiManager = cedefiManager_;
-        underlying = underlying_;
         settlementPeriod = 1;
-
-        updatePortfolios(portfolios_, weights_);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
 
     receive() external payable {}
 
+    function setUnderlying(address _underlying) public onlyManager {
+        require(_underlying != address(0), "invalid underlying");
+        underlying = _underlying;
+    }
     // to handle the depoisted underlying asset
     function onDepositUnderlying(address from, address underlyingToken, uint256 underlyingAmount)
         internal

@@ -66,33 +66,30 @@ contract sUSD1PlusVault is
     function initialize(
         string calldata name_,
         string calldata symbol_,
-        address underlying_,
-        address[] memory portfolios_,
-        uint256[] memory weights_,
         address cedefiManager_
     ) public initializer {
-        require(underlying_ != address(0), "Invalid underlying");
         require(cedefiManager_ != address(0), "Invalid cedefi manager");
-        require(portfolios_.length == weights_.length, "mismatch length of portfolios and weights");
-        require(portfolios_.length == 1, "only accept one portfolio");
 
         __EIP712_init("USD1Vault", "1.0");
         __UUPSUpgradeable_init();
         __ERC20_init(name_, symbol_);
 
         cedefiManager = cedefiManager_;
-        underlying = underlying_;
 
         settlementPeriod = 1;
         transferable = true;
-
-        updatePortfolios(portfolios_, weights_);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
 
     receive() external payable {
         revert("Not allowed to receive native token");
+    }
+
+    // @dev set underlying token
+    function setUnderlying(address _underlying) public onlyManager {
+        require(_underlying != address(0), "invalid underlying");
+        underlying = _underlying;
     }
 
     // @dev set the usd1 plus vault address

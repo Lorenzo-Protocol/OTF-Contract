@@ -102,17 +102,19 @@ contract CeDeFiManager is UUPSUpgradeable, AccessControlUpgradeable, CeDeFiManag
         }
 
         bytes memory data = abi.encodeWithSignature(
-            "initialize(string,string,address,address[],uint256[],address)",
-            params.name, params.symbol, params.underlying, params.portfolios, params.portfolioWeights, address(this)
+            "initialize(string,string,address)",
+            params.name, params.symbol,address(this)
         );
 
-        bytes32 salt = keccak256(abi.encode(params.yieldType, params.name, params.symbol, params.underlying));
+        bytes32 salt = keccak256(abi.encode(params.name, params.symbol));
         address vaultProxy = address(new ERC1967Proxy{salt: salt}(implementation, data));
         require(_vaults.contains(vaultProxy) == false, "CeDeFiManager: vault already exists");
         require(IVault(vaultProxy).getYieldType() == params.yieldType, "CeDeFiManager: vault yield type mismatch");
 
         _vaults.add(vaultProxy);
 
+        IVault(vaultProxy).setUnderlying(params.underlying);
+        IVault(vaultProxy).updatePortfolios(params.portfolios, params.portfolioWeights);
         IVault(vaultProxy).setMinDepositAmount(params.minDepositAmount);
         IVault(vaultProxy).setMinWithdrawAmount(params.minWithdrawAmount);
 

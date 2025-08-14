@@ -35,9 +35,10 @@ const config: HardhatUserConfig = {
       chainId: 1337,
       allowUnlimitedContractSize: true
     },
-    amoy: {
-      url: "https://rpc-amoy.polygon.technology",
-      accounts,
+    eth: {
+      // url: "https://patient-alien-glitter.quiknode.pro/***REMOVED***/",
+      url: "https://mainnet.infura.io/v3/***REMOVED***",
+      accounts: [process.env.ETH_MAINNET_KEY!],
     },
     node: {
       url: "http://13.208.44.230:8545",
@@ -92,7 +93,7 @@ const config: HardhatUserConfig = {
       url: "https://sepolia.base.org",
       // url: "https://base-sepolia.blockpi.network/v1/rpc/public",
       // url: "https://base-sepolia-rpc.publicnode.com",
-      accounts
+      accounts: [process.env.BASE_TESTNET_KEY!]
     },
     auroratest: {
       url: "https://testnet.aurora.dev/",

@@ -56,6 +56,7 @@ interface IVault is IERC20 {
     function freezeShares(address account, uint256 shares) external;
     function unfreezeShares(address account, uint256 shares) external;
     function setTransferable(bool transferable_) external;
+    function setUnderlying(address _underlying) external;
     function pause() external;
     function unpause() external;
 }
