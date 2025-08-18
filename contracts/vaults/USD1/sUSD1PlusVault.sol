@@ -126,6 +126,7 @@ contract sUSD1PlusVault is
 
         // calculate the shares amount
         unitNav = getUnitNav(settlementPeriod);
+        require(unitNav > 0, "oops: zero unit nav");
         sharesAmount = alignedAmount * Precision / unitNav;
 
         // calculate the pending shares

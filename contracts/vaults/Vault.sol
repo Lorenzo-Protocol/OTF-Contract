@@ -380,14 +380,15 @@ abstract contract Vault is
 
         unsettledWithdrawShares -= request.requestShares;
 
-        uint256 underlyingAmount = burnShares(msg.sender, settledPeriod, request.requestShares);
+        (uint256 underlyingAmount, uint256 unitNav)
+            = burnShares(msg.sender, settledPeriod, request.requestShares);
         onWithdrawUnderlying(msg.sender, underlyingAmount);
 
         emit WithdrawFinished(
             requestId,
             msg.sender,
             request.requestShares,
-            periodUnitNav[settledPeriod],
+            unitNav,
             block.timestamp
         );
     }
@@ -406,12 +407,13 @@ abstract contract Vault is
     // @dev burn shares from the target address, it should be calculated as : amount = shares * unitNav
     // @param from the target address
     // @param shares the amount of shares
-    function burnShares(address from, uint128 settledPeriod, uint256 sharesAmount) internal returns(uint256) {
-        uint256 unitNav = periodUnitNav[settledPeriod];
+    function burnShares(address from, uint128 settledPeriod, uint256 sharesAmount) internal returns(uint256, uint256) {
+        uint256 unitNav = getUnitNav(settledPeriod);
+        require(unitNav > 0, "oops: zero unit nav");
         uint256 amount = (sharesAmount * unitNav) / Precision;
         // burn shares and return the amount of underlying asset
         _burn(from, sharesAmount);
-        return amount;
+        return (amount, unitNav);
     }
     // @dev get the yield type of the vault
     function getYieldType() public view override returns (YieldType) {
