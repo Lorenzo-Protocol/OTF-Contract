@@ -34,9 +34,18 @@ contract sUSD1PlusVault is
     event SpecialMint(address[] tos, uint256[] amounts);
     // special burn
     event SpecialBurn(address from, uint256 sharesAmount);
+    // role setted
+    event RoleSetted(bytes32 indexed role, address indexed account, address indexed sender, bool isGrant);
+    // minter mint
+    event MinterMint(address indexed to, uint256 sharesAmount, address sender);
+    // burner burn
+    event BurnerBurn(address indexed from, uint256 sharesAmount, address sender);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
 
     mapping(address => mapping(uint128 => uint256)) public pendingShares; // user -> period -> pending shares
     mapping(address => bool) public signers; // signer -> is signer
@@ -50,6 +59,21 @@ contract sUSD1PlusVault is
     // because the user can not request withdraw the confirmed shares in the same period,
     // the confirmed shares must stay in the vault for at least next period
     mapping(address => mapping(uint128 => uint256)) public confirmedShares; // user -> period -> confirmed shares
+
+    // add roles for minter and burner for chainlink ccip @Sep. 3, 2025
+    // mint role:  0x01, burner role: 0x02
+    mapping(address => uint256) public roles; // account -> role
+    // ----------- ADD STATE VARIABLES -----------
+    // -------------------------------------------
+
+    modifier onlyMinter() {
+        require(roles[msg.sender] & uint256(0x01) == uint256(0x01), "minter only");
+        _;
+    }
+    modifier onlyBurner() {
+        require(roles[msg.sender] & uint256(0x02) == uint256(0x02), "burner only");
+        _;
+    }
 
     constructor() {
         _disableInitializers();
@@ -107,6 +131,18 @@ contract sUSD1PlusVault is
             require(signers_[i] != address(0), "zero signer");
             signers[signers_[i]] = isSigners_[i];
         }
+    }
+
+    // @dev set the minter role
+    function setRole(bytes32 role, address account, bool isGrant) public onlyManager {
+        if (role == MINTER_ROLE) {
+            roles[account] = isGrant ? roles[account] | uint256(0x01) : roles[account] & ~uint256(0x01);
+        } else if (role == BURNER_ROLE) {
+            roles[account] = isGrant ? roles[account] | uint256(0x02) : roles[account] & ~uint256(0x02);
+        } else {
+            revert("invalid role");
+        }
+        emit RoleSetted(role, account, msg.sender, isGrant);
     }
 
     // to handle the depoisted underlying asset
@@ -297,5 +333,24 @@ contract sUSD1PlusVault is
     // @param period the period to get the unit nav, period should gte 1
     function getCurrentUnitNav() public view returns (uint256) {
         return getUnitNav(settlementPeriod);
+    }
+
+    // @dev method mint for chainlink CCIP
+    function mint(address to, uint256 sharesAmount) public onlyMinter {
+        _mint(to, sharesAmount);
+        emit MinterMint(to, sharesAmount, msg.sender);
+    }
+
+    // @dev method burn for chainlinkCCIP
+    function burn(uint256 sharesAmount) public {
+        require(sharesAmount <= getUsableShares(msg.sender), "not enough shares amount");
+        _burn(msg.sender, sharesAmount);
+    }
+
+    // @dev method burnFrom for chainlink CCIP
+    function burnFrom(address from, uint256 sharesAmount) public onlyBurner {
+        require(sharesAmount <= getUsableShares(from), "not enough shares amount");
+        _burn(from, sharesAmount);
+        emit BurnerBurn(from, sharesAmount, msg.sender);
     }
 }

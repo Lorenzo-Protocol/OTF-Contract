@@ -20,7 +20,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
+        runs: 50
       }
     }
   },
@@ -28,6 +28,7 @@ const config: HardhatUserConfig = {
     apiKey: {
       bsc: '***REMOVED***',
       bscTestnet: '***REMOVED***',
+      mainnet: '***REMOVED***'
     }
   },
   networks: {

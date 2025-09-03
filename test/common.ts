@@ -31,7 +31,7 @@ export async function preDeploy() {
 
   const CeDeFiManager = await ethers.getContractAt('CeDeFiManager', ManagerProxy.target);
   // add support functions
-  const Vault =  new ethers.Interface(require(path.join(__dirname, '..', 'artifacts', 'contracts', 'vaults', 'Vault.sol', 'Vault.json')).abi);
+  const Vault =  new ethers.Interface(require(path.join(__dirname, '..', 'artifacts/contracts/vaults/USD1/sUSD1PlusVault.sol/sUSD1PlusVault.json')).abi);
   await CeDeFiManager.connect(admin).setInvokableVaultsFuncs([
     Vault.getFunction('updatePortfolios')!.selector,
     Vault.getFunction('setMinDepositAmount')!.selector,
@@ -44,7 +44,11 @@ export async function preDeploy() {
     Vault.getFunction('setTransferable')!.selector,
     Vault.getFunction('pause')!.selector,
     Vault.getFunction('unpause')!.selector,
-  ], [true, true, true, true, true, true, true, true, true, true, true]);
+    Vault.getFunction('setSigner')!.selector,
+    Vault.getFunction('setUsd1PlusVault')!.selector,
+    Vault.getFunction('setAcceptUnderlying')!.selector,
+    Vault.getFunction('setRole')!.selector,
+  ], [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
 
 
   const MultiSendImpl = await ethers.deployContract("MultiSend");
