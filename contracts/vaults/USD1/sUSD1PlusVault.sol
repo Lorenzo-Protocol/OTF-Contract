@@ -24,28 +24,21 @@ contract sUSD1PlusVault is
     event ConfirmShares (address indexed user, bytes32 indexed txHash, uint128 indexed period, uint256 shares);
     // users refund the shares after KYT failed
     event RefundShares  (address indexed user, bytes32 indexed txHash, uint128 indexed period, uint256 shares);
-    // usd1 plus vault set
-    event Usd1PlusVaultSet(address indexed usd1PlusVault);
-    // swap usd1+ to susd1
-    event SwapUsd1PlusToSusd1(address indexed user, uint256 sharesAmount);
-    // swap susd1 to usd1+
-    event SwapSusd1ToUsd1Plus(address indexed user, uint256 sharesAmount);
-    // special mint
-    event SpecialMint(address[] tos, uint256[] amounts);
-    // special burn
-    event SpecialBurn(address from, uint256 sharesAmount);
     // role setted
     event RoleSetted(bytes32 indexed role, address indexed account, address indexed sender, bool isGrant);
     // minter mint
     event MinterMint(address indexed to, uint256 sharesAmount, address sender);
     // burner burn
     event BurnerBurn(address indexed from, uint256 sharesAmount, address sender);
+    // pendle deposit
+    event DirectDeposit(address indexed user, uint128 period, address underlyingToken, uint256 underlyingAmount, uint256 sharesAmount);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
 
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");  // 0x01
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");  // 0x02
+    bytes32 public constant DEPOSIT_ROLE = keccak256("DEPOSIT_ROLE"); // 0x04
 
     mapping(address => mapping(uint128 => uint256)) public pendingShares; // user -> period -> pending shares
     mapping(address => bool) public signers; // signer -> is signer
@@ -61,7 +54,7 @@ contract sUSD1PlusVault is
     mapping(address => mapping(uint128 => uint256)) public confirmedShares; // user -> period -> confirmed shares
 
     // add roles for minter and burner for chainlink ccip @Sep. 3, 2025
-    // mint role:  0x01, burner role: 0x02
+    // mint role:  0x01, burner role: 0x02, depositor role: 0x04
     mapping(address => uint256) public roles; // account -> role
     // ----------- ADD STATE VARIABLES -----------
     // -------------------------------------------
@@ -72,6 +65,10 @@ contract sUSD1PlusVault is
     }
     modifier onlyBurner() {
         require(roles[msg.sender] & uint256(0x02) == uint256(0x02), "burner only");
+        _;
+    }
+    modifier onlyDepositor() {
+        require(roles[msg.sender] & uint256(0x04) == uint256(0x04), "depositor only");
         _;
     }
 
@@ -116,13 +113,6 @@ contract sUSD1PlusVault is
         underlying = _underlying;
     }
 
-    // @dev set the usd1 plus vault address
-    function setUsd1PlusVault(address _usd1PlusVault) public onlyManager {
-        require(_usd1PlusVault != address(0), "invalid usd1 plus vault");
-        usd1PlusVault = IUSD1PlusVault(_usd1PlusVault);
-        emit Usd1PlusVaultSet(_usd1PlusVault);
-    }
-
     // @dev set the signer
     function setSigner(address[] memory signers_, bool[] memory isSigners_) public onlyManager {
         require(signers_.length == isSigners_.length, "mismatch length of signers");
@@ -139,6 +129,8 @@ contract sUSD1PlusVault is
             roles[account] = isGrant ? roles[account] | uint256(0x01) : roles[account] & ~uint256(0x01);
         } else if (role == BURNER_ROLE) {
             roles[account] = isGrant ? roles[account] | uint256(0x02) : roles[account] & ~uint256(0x02);
+        } else if (role == DEPOSIT_ROLE) {
+            roles[account] = isGrant ? roles[account] | uint256(0x04) : roles[account] & ~uint256(0x04);
         } else {
             revert("invalid role");
         }
@@ -252,67 +244,6 @@ contract sUSD1PlusVault is
         emit RefundShares(msg.sender, txHash, period, sharesAmount);
     }
 
-    // @dev swap usd1+ to susd1
-    // only usd1 plus vault can call
-    function swapToSusd1(address to, uint256 sharesAmount) public whenNotPaused {
-        require(msg.sender == address(usd1PlusVault), "only usd1 plus vault can call");
-
-        _transfer(address(usd1PlusVault), to, sharesAmount);
-
-        emit SwapUsd1PlusToSusd1(to, sharesAmount);
-    }
-
-    // @dev swap susd1 to usd1+
-    function swapToUsd1Plus(uint256 sharesAmount)
-        public
-        whenNotPaused
-        notBlacklisted
-    {
-        require(sharesAmount > 0, "invalid shares amount");
-
-        uint256 usableShares = getUsableShares(msg.sender);
-        require(sharesAmount <= usableShares, "insufficient usableshares amount");
-
-        // lock the shares
-        _transfer(msg.sender, address(usd1PlusVault), sharesAmount);
-
-        // mint the shares to the receiver
-        usd1PlusVault.mint(msg.sender, sharesAmount);
-
-        emit SwapSusd1ToUsd1Plus(msg.sender, sharesAmount);
-    }
-
-    // @dev special mint function for owner
-    function specialMint(address[] memory tos, uint256[] memory sharesAmounts) public onlyManager {
-        require(tos.length == sharesAmounts.length, "length mismatch tos and sharesAmounts");
-
-        uint256 len = tos.length;
-        for (uint256 i; i < len; ) {
-            require(tos[i] != address(0), "zero address");
-            require(sharesAmounts[i] > 0, "zero amount");
-
-            _mint(tos[i], sharesAmounts[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        emit SpecialMint(tos, sharesAmounts);
-    }
-
-    // @dev special burn function
-    function specialBurn(uint256 sharesAmount) public {
-        require(sharesAmount > 0, "invalid shares amount");
-
-        uint256 usableShares = getUsableShares(msg.sender);
-        require(sharesAmount <= usableShares, "insufficient usableshares amount");
-
-        _burn(msg.sender, sharesAmount);
-
-        emit SpecialBurn(msg.sender, sharesAmount);
-    }
-
     // @dev get the details of the balance
     struct BalanceDetails {
         uint256 totalShares;      // total shares of the user
@@ -352,5 +283,29 @@ contract sUSD1PlusVault is
         require(sharesAmount <= getUsableShares(from), "not enough shares amount");
         _burn(from, sharesAmount);
         emit BurnerBurn(from, sharesAmount, msg.sender);
+    }
+
+    // @dev method for Pendle or someone else to deposit without KYT.
+    // just composit the deposit and confirm function.
+    function directDeposit(address underlyingToken, uint256 underlyingAmount) public onlyDepositor {
+        require(acceptUnderlying[underlyingToken] || underlyingToken == underlying);
+                // transfer the underlying asset to the ceff wallet
+        address ceffWallet = _portfolios.at(0);
+        IERC20 assetToken = IERC20(underlyingToken);
+        SafeERC20.safeTransferFrom(assetToken, msg.sender, ceffWallet, underlyingAmount);
+
+        uint256 alignedAmount = alignDepositAmount(underlyingAmount, underlyingToken);
+        require(alignedAmount >= minDepositAmount, "deposit amount too small");
+
+        // calculate the shares amount
+        uint256 unitNav = getUnitNav(settlementPeriod);
+        require(unitNav > 0, "oops: zero unit nav");
+        uint256 sharesAmount = alignedAmount * Precision / unitNav;
+
+        // mint the shares
+        _mint(msg.sender, sharesAmount);
+
+        // emit the event
+        emit DirectDeposit(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount);
     }
 }

@@ -292,7 +292,7 @@ abstract contract Vault is
 
     // @dev deposit underlying asset to the vault, mint shares to the target address
     function deposit(address underlyingToken, uint256 underlyingAmount)
-        external
+        public
         whenNotPaused
         notBlacklisted
         lock
