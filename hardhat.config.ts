@@ -20,7 +20,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 50
+        runs: 200
       }
     }
   },
@@ -47,7 +47,7 @@ const config: HardhatUserConfig = {
     },
     sepolia: {
       url: "https://eth-sepolia.public.blastapi.io",
-      accounts,
+      accounts: [process.env.ETH_SEPOLIA_KEY!],
     },
     polygon: {
       url: "https://polygon.llamarpc.com",
