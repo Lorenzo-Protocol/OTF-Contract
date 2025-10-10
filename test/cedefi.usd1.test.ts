@@ -4,8 +4,7 @@ import {
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { preDeploy } from "./common";
-import { TypedDataDomain } from "ethers";
+import { preDeploy, getClaimSinature } from "./common";
 
 const Precesion = ethers.parseEther("1");
 
@@ -20,34 +19,6 @@ this.beforeEach(async function () {
 // this.afterEach(async function () {
 
 // });
-
-async function getClaimSinature(operator: any, contract: string, period: bigint, user: string, sharesAmount: bigint, txHash: string) {
-  const domain: TypedDataDomain = {
-    name: "USD1Vault",
-    version: "1.0",
-    verifyingContract:contract,
-    chainId: (await ethers.provider.getNetwork()).chainId
-  };
-// uint128 period,address user,uint256 sharesAmount
-  const types = {
-    "ConfirmShare":[
-      {name: "period", type: "uint128"},
-      {name: "txHash", type: "bytes32"},
-      {name: "user", type: "address"},
-      {name: "sharesAmount", type: "uint256"},
-    ]
-  };
-
-  const values = {
-    period,
-    txHash,
-    user,
-    sharesAmount,
-  };
-
-  const signature = await operator.signTypedData(domain, types, values);
-  return signature;
-}
 
 async function deployUSD1PlusVault(susd1Vault: string) {
   const {admin} = AllContracts;
@@ -157,8 +128,9 @@ it("work flow", async function () {
 
     // 尚未确定份额，所以为0
     expect(await susd1Vault.balanceOf(player1.address)).to.equal(0);
-
-    const signature = await getClaimSinature(signer1, susd1Vault.target as string, 1n, player1.address, 3n*depositAmount, t.hash);
+    const name = "USD1Vault";
+    const version = "1.0";
+    const signature = await getClaimSinature(signer1, name, version, susd1Vault.target as string, 1n, player1.address, 3n*depositAmount, t.hash);
     await susd1Vault.connect(player1).confirmShare(1n, t.hash, 3n*depositAmount, signature);
 
     // 现在份额为100 * 3, 因为deposit了3次

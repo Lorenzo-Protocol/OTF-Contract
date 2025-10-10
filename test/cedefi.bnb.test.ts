@@ -4,7 +4,7 @@ import {
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { preDeploy } from "./common";
+import { preDeploy, getClaimSinature } from "./common";
 
 const Precesion = ethers.parseEther("1");
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -19,49 +19,64 @@ this.beforeEach(async function () {
 });
 
 it("create Vault", async function () {
-    const {admin, CeDeFiManager, player1, portfolio1, portfolio2, portfolio3} = AllContracts;
+    const {admin, CeDeFiManager, player1, portfolio1, portfolio2, portfolio3, signer1} = AllContracts;
     await ethers.provider.send("hardhat_setBalance", [portfolio1.address, "0x0"]);
     await ethers.provider.send("hardhat_setBalance", [portfolio2.address, "0x0"]);
     await ethers.provider.send("hardhat_setBalance", [portfolio3.address, "0x0"]);
 
-    const minDepositAmount = ethers.parseEther("1");
+    const minDepositAmount = ethers.parseEther("0.02");
     const minWithdrawAmount = ethers.parseEther("0.5");
-    const pp1 = ethers.parseEther("0.2");
-    const pp2 = ethers.parseEther("0.3");
-    const pp3 = ethers.parseEther("0.5");
+    const pp1 = ethers.parseEther("1.0");
 
-    await CeDeFiManager.connect(admin).addPortfolios([portfolio1.address, portfolio2.address, portfolio3.address]);
-    const implementation = await ethers.deployContract("SimpleVault");
+    await CeDeFiManager.connect(admin).addPortfolios([portfolio1.address]);
+    const implementation = await ethers.deployContract("BnbPlusVault");
     await implementation.waitForDeployment();
 
     await CeDeFiManager.connect(admin).createVault(
       {
         yieldType: 1,  // yield type 1
-        name: "Hash Group BNB",
-        symbol: "hgBNB",
+        name: "BNB+",
+        symbol: "BNB+",
         underlying: NATIVE_TOKEN,
         minDepositAmount,
         minWithdrawAmount,
-        portfolios: [portfolio1.address, portfolio2.address, portfolio3.address],
-        portfolioWeights: [pp1, pp2, pp3]
+        portfolios: [portfolio1.address],
+        portfolioWeights: [pp1]
       },
       implementation.target
     );
 
     const vaultAddress= await CeDeFiManager.getVault(0);
-    const hgBNBVault = await ethers.getContractAt("SimpleVault", vaultAddress);
+    const hgBNBVault = await ethers.getContractAt("BnbPlusVault", vaultAddress);
+
+    // set unit nav
+    const setSigners = hgBNBVault.interface.encodeFunctionData(
+      'setSigner',
+      [[signer1.address], [true]]
+    );
+    await CeDeFiManager.connect(admin).executeCommand(vaultAddress, setSigners);
 
     const depositAmount = ethers.parseEther("1.0");
     let t = await hgBNBVault.connect(player1).deposit(NATIVE_TOKEN, depositAmount, {value: depositAmount});
     await t.wait();
 
     const pp1Balance = await ethers.provider.getBalance(portfolio1.address);
-    const pp2Balance = await ethers.provider.getBalance(portfolio2.address);
-    const pp3Balance = await ethers.provider.getBalance(portfolio3.address);
 
     expect(pp1Balance).to.equal(depositAmount * pp1 / Precesion);
-    expect(pp2Balance).to.equal(depositAmount * pp2 / Precesion);
-    expect(pp3Balance).to.equal(depositAmount * pp3 / Precesion);
+
+    const name = "BnbPlusVault";
+    const version = "1.0";
+    const signature = await getClaimSinature(
+      signer1,
+      name,
+      version,
+      hgBNBVault.target as string,
+      1n,
+      player1.address,
+      depositAmount,
+      t.hash
+    );
+    await hgBNBVault.connect(player1).confirmShare(1n, t.hash, depositAmount, signature);
 
     const hgBNBBalance = await hgBNBVault.balanceOf(player1.address);
     expect(hgBNBBalance).to.equal(depositAmount);

@@ -1,5 +1,6 @@
 import { ethers } from "hardhat";
 import path from "path";
+import { TypedDataDomain } from "ethers";
 
 export async function preDeploy() {
   const [boss, admin, operator, player1, player2, player3, signer1, portfolio1, portfolio2, portfolio3] = await ethers.getSigners();
@@ -45,10 +46,9 @@ export async function preDeploy() {
     Vault.getFunction('pause')!.selector,
     Vault.getFunction('unpause')!.selector,
     Vault.getFunction('setSigner')!.selector,
-    Vault.getFunction('setUsd1PlusVault')!.selector,
     Vault.getFunction('setAcceptUnderlying')!.selector,
     Vault.getFunction('setRole')!.selector,
-  ], [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
+  ], [ true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
 
 
   const MultiSendImpl = await ethers.deployContract("MultiSend");
@@ -64,4 +64,42 @@ export async function preDeploy() {
   const MultiSend = await ethers.getContractAt("MultiSend", MultiSendProxy.target);
 
   return {boss, admin, operator, player1, player2, player3, signer1, CeDeFiManager, BBTC, USD1, USDT, USDC, portfolio1, portfolio2, portfolio3, MultiSend};
+}
+
+
+export async function getClaimSinature(
+  operator: any,
+  name: string,
+  version: string,
+  contract: string,
+  period: bigint,
+  user: string,
+  sharesAmount: bigint,
+  txHash: string
+) {
+  const domain: TypedDataDomain = {
+    name,
+    version,
+    verifyingContract:contract,
+    chainId: (await ethers.provider.getNetwork()).chainId
+  };
+// uint128 period,address user,uint256 sharesAmount
+  const types = {
+    "ConfirmShare":[
+      {name: "period", type: "uint128"},
+      {name: "txHash", type: "bytes32"},
+      {name: "user", type: "address"},
+      {name: "sharesAmount", type: "uint256"},
+    ]
+  };
+
+  const values = {
+    period,
+    txHash,
+    user,
+    sharesAmount,
+  };
+
+  const signature = await operator.signTypedData(domain, types, values);
+  return signature;
 }
