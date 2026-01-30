@@ -32,6 +32,8 @@ contract sUSD1PlusVault is
     event BurnerBurn(address indexed from, uint256 sharesAmount, address sender);
     // pendle deposit
     event DirectDeposit(address indexed user, uint128 period, address underlyingToken, uint256 underlyingAmount, uint256 sharesAmount);
+    // BN wallet supply
+    event Supply(address indexed user, uint128 period, address underlyingToken, uint256 underlyingAmount, uint256 sharesAmount);
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
@@ -285,9 +287,8 @@ contract sUSD1PlusVault is
         emit BurnerBurn(from, sharesAmount, msg.sender);
     }
 
-    // @dev method for Pendle or someone else to deposit without KYT.
-    // just composit the deposit and confirm function.
-    function directDeposit(address underlyingToken, uint256 underlyingAmount) public onlyDepositor {
+    // @dev internal method to supply the shares
+    function _supply(address underlyingToken, uint256 underlyingAmount) internal returns (uint256) {
         require(acceptUnderlying[underlyingToken] || underlyingToken == underlying);
                 // transfer the underlying asset to the ceff wallet
         address ceffWallet = _portfolios.at(0);
@@ -305,7 +306,21 @@ contract sUSD1PlusVault is
         // mint the shares
         _mint(msg.sender, sharesAmount);
 
+        return sharesAmount;
+    }
+
+    // @dev method for Pendle or someone else to deposit without KYT.
+    // just composit the deposit and confirm function.
+    function directDeposit(address underlyingToken, uint256 underlyingAmount) public onlyDepositor {
+        uint256 sharesAmount = _supply(underlyingToken, underlyingAmount);
         // emit the event
         emit DirectDeposit(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount);
+    }
+
+    // @dev method for BN wallet
+    function supply(address underlyingToken, uint256 underlyingAmount) public {
+        uint256 sharesAmount = _supply(underlyingToken, underlyingAmount);
+        // emit the event
+        emit Supply(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount);
     }
 }
