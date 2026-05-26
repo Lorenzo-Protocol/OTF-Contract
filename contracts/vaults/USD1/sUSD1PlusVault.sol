@@ -31,9 +31,32 @@ contract sUSD1PlusVault is
     // burner burn
     event BurnerBurn(address indexed from, uint256 sharesAmount, address sender);
     // pendle deposit
-    event DirectDeposit(address indexed user, uint128 period, address underlyingToken, uint256 underlyingAmount, uint256 sharesAmount);
+    event DirectDeposit(
+        address indexed user,
+        uint128 period,
+        address underlyingToken,
+        uint256 underlyingAmount,
+        uint256 sharesAmount,
+        uint256 unitNav,
+        uint256 timestamp
+    );
     // BN wallet supply
-    event Supply(address indexed user, uint128 period, address underlyingToken, uint256 underlyingAmount, uint256 sharesAmount);
+    event Supply(
+        address indexed user,
+        uint128 period,
+        address underlyingToken,
+        uint256 underlyingAmount,
+        uint256 sharesAmount,
+        uint256 unitNav,
+        uint256 timestamp
+    );
+
+    event Unsupply(
+        uint128 indexed requestId,
+        address indexed sender,
+        uint256 sharesAmount,
+        uint256 timestamp
+    );
 
     bytes32 public constant CONFIRM_SHARE = keccak256("ConfirmShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
     bytes32 public constant REFUND_SHARE = keccak256("RefundShare(uint128 period,bytes32 txHash,address user,uint256 sharesAmount)");
@@ -288,7 +311,7 @@ contract sUSD1PlusVault is
     }
 
     // @dev internal method to supply the shares
-    function _supply(address underlyingToken, uint256 underlyingAmount) internal returns (uint256) {
+    function _supply(address underlyingToken, uint256 underlyingAmount) internal returns (uint256, uint256) {
         require(acceptUnderlying[underlyingToken] || underlyingToken == underlying);
                 // transfer the underlying asset to the ceff wallet
         address ceffWallet = _portfolios.at(0);
@@ -306,21 +329,27 @@ contract sUSD1PlusVault is
         // mint the shares
         _mint(msg.sender, sharesAmount);
 
-        return sharesAmount;
+        return (sharesAmount, unitNav);
     }
 
     // @dev method for Pendle or someone else to deposit without KYT.
     // just composit the deposit and confirm function.
     function directDeposit(address underlyingToken, uint256 underlyingAmount) public onlyDepositor {
-        uint256 sharesAmount = _supply(underlyingToken, underlyingAmount);
+        (uint256 sharesAmount, uint256 unitNav) = _supply(underlyingToken, underlyingAmount);
         // emit the event
-        emit DirectDeposit(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount);
+        emit DirectDeposit(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount, unitNav, block.timestamp);
     }
 
     // @dev method for BN wallet
     function supply(address underlyingToken, uint256 underlyingAmount) public {
-        uint256 sharesAmount = _supply(underlyingToken, underlyingAmount);
+        (uint256 sharesAmount, uint256 unitNav) = _supply(underlyingToken, underlyingAmount);
         // emit the event
-        emit Supply(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount);
+        emit Supply(msg.sender, settlementPeriod, underlyingToken, underlyingAmount, sharesAmount, unitNav, block.timestamp);
+    }
+
+    // @dev method for BN wallet to unsupply the shares
+    function unsupply(uint256 sharesAmount) public {
+        uint128 requestId = requestWithdraw(sharesAmount);
+        emit Unsupply(requestId, msg.sender, sharesAmount, block.timestamp);
     }
 }
