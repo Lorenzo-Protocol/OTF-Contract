@@ -318,15 +318,7 @@ abstract contract Vault is
         );
     }
 
-    // @dev request to withdraw shares, it will be executed while current period is settled
-    function requestWithdraw(uint256 shareAmount)
-        public
-        virtual
-        whenNotPaused
-        notBlacklisted
-        lock
-        returns (uint128)
-    {
+    function _doRequestWithdraw(uint256 shareAmount) internal returns (uint128) {
         require(shareAmount > 0, "share amount is zero");
         uint256 sharesBalance = getUsableShares(msg.sender);
         if (shareAmount != sharesBalance) { // make sure sender can withdraw all shares
@@ -345,6 +337,20 @@ abstract contract Vault is
         // to record the total withdraw shares of this period, and sub it while this period is settled
         // so these shares stop yielding
         periodWithdrawShares[requestId] += shareAmount;
+
+        return requestId;
+    }
+
+    // @dev request to withdraw shares, it will be executed while current period is settled
+    function requestWithdraw(uint256 shareAmount)
+        public
+        virtual
+        whenNotPaused
+        notBlacklisted
+        lock
+        returns (uint128)
+    {
+        uint128 requestId = _doRequestWithdraw(shareAmount);
 
         emit WithdrawRequested(
             requestId,

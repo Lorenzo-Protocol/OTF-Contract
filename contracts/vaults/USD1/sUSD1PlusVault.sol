@@ -349,7 +349,7 @@ contract sUSD1PlusVault is
 
     // @dev method for BN wallet to unsupply the shares
     function unsupply(uint256 sharesAmount) public {
-        uint128 requestId = requestWithdraw(sharesAmount);
+        uint128 requestId = _doRequestWithdraw(sharesAmount);
         emit Unsupply(requestId, msg.sender, sharesAmount, block.timestamp);
     }
 }
