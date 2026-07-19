@@ -101,4 +101,14 @@ contract SimpleVault is
     {
         sendUnderlying(to, underlyingAmount);
     }
+
+    // @dev get current unit nav
+    function getCurrentUnitNav() public view returns (uint256) {
+        return getUnitNav(settlementPeriod);
+    }
+
+    // @dev get underlying token
+    function getUnderlying() public view returns (address) {
+        return underlying;
+    }
 }

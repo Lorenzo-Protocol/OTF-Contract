@@ -213,34 +213,20 @@ abstract contract Vault is
         return rawSupply - unsettledWithdrawShares;
     }
 
-    // @dev transfer shares token to the target address, should check the freezed shares
-    function transfer(address recipient, uint256 amount)
-        public
-        virtual
-        override(IERC20, ERC20Upgradeable)
+    // @dev limit transfer and transferFrom
+    function _update(address from, address to, uint256 value) internal override virtual
         whenNotPaused
-        notBlacklisted
-        returns (bool)
     {
-        require(transferable, "Not transferable");
-        require(getUsableShares(msg.sender) >= amount, "Insufficient balance");
-        return super.transfer(recipient, amount);
-    }
-
-    // @dev ban transferFrom
-    //  not allowed approve someone else to transfer shares
-    function transferFrom(address from, address to, uint256 value)
-        public
-        virtual
-        override(IERC20, ERC20Upgradeable)
-        whenNotPaused
-        notBlacklisted
-        returns (bool)
-    {
-        require(transferable, "Not transferable");
         require(!blacklisted[from], "from is blacklisted");
-        require(getUsableShares(from) >= value, "Insufficient balance");
-        return super.transferFrom(from, to, value);
+        require(!blacklisted[to], "to is blacklisted");
+
+        // not mint or burn
+        if (from != address(0) && to != address(0)) {
+            require(transferable, "Not transferable");
+            require(getUsableShares(from) >= value, "Insufficient balance");
+        }
+
+        return super._update(from, to, value);
     }
 
     // @dev get usable shares of the target address
