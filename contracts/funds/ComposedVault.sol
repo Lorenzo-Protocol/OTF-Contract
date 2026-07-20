@@ -29,7 +29,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///      1) child getUsableShares excludes pending redemptions from NAV / free balance;
 ///      2) userRequestShares / totalRequestShares track each user's share of a merged period;
 ///      3) each (vault, period) is pulled at most once, then users are paid pro-rata.
-abstract contract ComposedVault is
+contract ComposedVault is
     ERC20Upgradeable,
     UUPSUpgradeable,
     OwnableUpgradeable,
@@ -282,9 +282,7 @@ abstract contract ComposedVault is
             address vaultAddr = _vaults[i];
             uint128 reqId = _reqIds[i];
 
-            uint256 requestShares = userRequestShares[msg.sender][vaultAddr][
-                reqId
-            ];
+            uint256 requestShares = userRequestShares[msg.sender][vaultAddr][reqId];
             require(requestShares > 0, "zero user request shares");
             delete userRequestShares[msg.sender][vaultAddr][reqId];
             unchecked {
