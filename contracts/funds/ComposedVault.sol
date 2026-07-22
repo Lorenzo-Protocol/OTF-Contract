@@ -21,6 +21,7 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {YieldType} from "../intf/IVault.sol";
 
 /// @notice Composes multiple SimpleVaults with fixed weights.
 /// @dev SimpleVault merges withdraw requests by (msg.sender, period). Since this
@@ -51,6 +52,7 @@ contract ComposedVault is
     event SetUnderlying(address underlying);
     event SetVaults(VaultConfig[] vaults);
     event SetMinDepositAmount(uint256 amount);
+    event SetMinWithdrawAmount(uint256 amount);
     event Deposited(address indexed sender, uint256 amount, uint256 shares);
     event WithdrawRequested(
         address indexed sender,
@@ -67,6 +69,8 @@ contract ComposedVault is
 
     VaultConfig[] public vaults;
     uint256 public minDepositAmount;
+    uint256 public minWithdrawAmount;
+
     address private _underlying;
 
     /// @dev Number of outstanding (user, vault, reqId) claim entries.
@@ -108,6 +112,14 @@ contract ComposedVault is
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function getYieldType() external pure returns (YieldType) {
+        return YieldType.Custody;
+    }
+
+    function updatePortfolios(address[] memory portfolios, uint256[] memory weights) external pure {
+        // do nothing for composed vault
     }
 
     function getUnderlying() external view returns (address) {
@@ -158,6 +170,11 @@ contract ComposedVault is
     function setMinDepositAmount(uint256 amount) external onlyOwner {
         minDepositAmount = amount;
         emit SetMinDepositAmount(amount);
+    }
+
+    function setMinWithdrawAmount(uint256 amount) external onlyOwner {
+        minWithdrawAmount = amount;
+        emit SetMinWithdrawAmount(amount);
     }
 
     /// @dev Deposit underlying into child vaults by weight, mint composed shares

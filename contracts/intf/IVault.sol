@@ -8,7 +8,8 @@ enum YieldType {
     Custody,      // underlying assert is custodyed to third party, like Ceffu
     PrimeWallet,  // underlying assert is deposited to prime wallet, like coinbase prime wallet
     DefiProtocol, // underlying assert is deposited to defi protocol
-    FromFund      // underlying assert is deposited to centralized fund
+    FromFund,     // underlying assert is deposited to centralized fund
+    Composed      // underlying assert is composed of multiple vaults
 }
 
 interface IVault is IERC20 {
