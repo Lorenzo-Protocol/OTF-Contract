@@ -12,6 +12,8 @@ interface ISimpleVault is IERC20 {
     function getUnderlying() external view returns (address);
     function getCurrentUnitNav() external view returns (uint256);
     function getUsableShares(address account) external view returns(uint256);
+    function minDepositAmount() external view returns (uint256);
+    function minWithdrawAmount() external view returns (uint256);
 
     // manager functions
     function updatePortfolios(address[] calldata portfolios, uint256[] calldata weights) external;

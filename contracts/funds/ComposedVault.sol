@@ -21,6 +21,7 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {YieldType} from "../intf/IVault.sol";
 
 /// @notice Composes multiple SimpleVaults with fixed weights.
@@ -49,18 +50,18 @@ contract ComposedVault is
     error InvalidVault(address vault);
     error PendingWithdrawClaims();
 
-    event SetUnderlying(address underlying);
-    event SetVaults(VaultConfig[] vaults);
-    event SetMinDepositAmount(uint256 amount);
-    event SetMinWithdrawAmount(uint256 amount);
-    event Deposited(address indexed sender, uint256 amount, uint256 shares);
-    event WithdrawRequested(
+    event ComposedSetUnderlying(address underlying);
+    event ComposedSetVaults(VaultConfig[] vaults);
+    event ComposedSetMinDepositAmount(uint256 amount);
+    event ComposedSetMinWithdrawAmount(uint256 amount);
+    event ComposedDeposited(address indexed sender, uint256 amount, uint256 shares);
+    event ComposedWithdrawRequested(
         address indexed sender,
         uint256 shares,
         address[] vaults,
         uint128[] reqIds
     );
-    event Withdrawn(
+    event ComposedWithdrawn(
         address indexed sender,
         uint256 amount,
         address[] vaults,
@@ -68,8 +69,8 @@ contract ComposedVault is
     );
 
     VaultConfig[] public vaults;
-    uint256 public minDepositAmount;
-    uint256 public minWithdrawAmount;
+    // uint256 private _minDepositAmount;
+    // uint256 private _minWithdrawAmount;
 
     address private _underlying;
 
@@ -130,7 +131,7 @@ contract ComposedVault is
         require(underlying != address(0), "underlying is zero address");
         require(_underlying == address(0), "underlying is already set");
         _underlying = underlying;
-        emit SetUnderlying(underlying);
+        emit ComposedSetUnderlying(underlying);
     }
 
     /// @dev Only allowed when no composed shares and no outstanding withdraw claims.
@@ -164,17 +165,51 @@ contract ComposedVault is
         for (uint256 i; i < length; ++i) {
             vaults.push(_vaults[i]);
         }
-        emit SetVaults(_vaults);
+        emit ComposedSetVaults(_vaults);
     }
 
-    function setMinDepositAmount(uint256 amount) external onlyOwner {
-        minDepositAmount = amount;
-        emit SetMinDepositAmount(amount);
+    // @dev Minimum deposit amount for the composed vault.
+    //      Derived so each child receives at least its own minDeposit after weight split:
+    //      amount * weight / ONE >= childMin  =>  amount >= ceil(childMin * ONE / weight).
+    function minDepositAmount() public view returns (uint256 minDeposit) {
+        uint256 length = vaults.length;
+        for (uint256 i; i < length; ++i) {
+            minDeposit = Math.max(
+                minDeposit,
+                (ISimpleVault(vaults[i].vault).minDepositAmount() * ONE + vaults[i].weight - 1) / vaults[i].weight
+            );
+        }
     }
 
-    function setMinWithdrawAmount(uint256 amount) external onlyOwner {
-        minWithdrawAmount = amount;
-        emit SetMinWithdrawAmount(amount);
+    // @dev Minimum composed shares for a *partial* redeem.
+    //      Full exit (shares == totalSupply) is always allowed by child vaults.
+    //      Uses getUsableShares (same basis as requestWithdraw), not raw balanceOf.
+    function minWithdrawAmount() public view returns (uint256 minWithdraw) {
+        uint256 supply = totalSupply();
+        if (supply == 0) {
+            return 0;
+        }
+
+        uint256 length = vaults.length;
+        for (uint256 i; i < length; ++i) {
+            ISimpleVault vault = ISimpleVault(vaults[i].vault);
+            uint256 usable = vault.getUsableShares(address(this));
+            if (usable == 0) {
+                continue;
+            }
+
+            uint256 minRequest = vault.minWithdrawAmount();
+            if (minRequest == 0) {
+                continue;
+            }
+
+            // usable * shares / supply >= minRequest
+            // => shares >= ceil(minRequest * supply / usable)
+            minWithdraw = Math.max(
+                minWithdraw,
+                (minRequest * supply + usable - 1) / usable
+            );
+        }
     }
 
     /// @dev Deposit underlying into child vaults by weight, mint composed shares
@@ -184,7 +219,7 @@ contract ComposedVault is
         uint256 amount
     ) external whenNotPaused nonReentrant {
         require(address(depositToken) == _underlying, "invalid deposit token");
-        require(amount >= minDepositAmount, "lt min deposit amount");
+        require(amount >= minDepositAmount(), "lt min deposit amount");
 
         uint256 length = vaults.length;
         require(length > 0, "vaults not set");
@@ -219,7 +254,7 @@ contract ComposedVault is
         uint256 shares = (amount * ONE) / nav;
         require(shares > 0, "zero shares");
         _mint(msg.sender, shares);
-        emit Deposited(msg.sender, amount, shares);
+        emit ComposedDeposited(msg.sender, amount, shares);
     }
 
     /// @dev Burn composed shares and request proportional free child shares.
@@ -231,6 +266,10 @@ contract ComposedVault is
 
         uint256 supply = totalSupply();
         require(shares <= supply, "insufficient supply");
+        // Child vaults waive minWithdraw only when redeeming all usable shares.
+        if (shares != supply) {
+            require(shares >= minWithdrawAmount(), "lt min withdraw amount");
+        }
 
         uint256 length = vaults.length;
         require(length > 0, "vaults not set");
@@ -261,7 +300,7 @@ contract ComposedVault is
             totalRequestShares[vaultAddr][reqId] += withdrawShares;
         }
 
-        emit WithdrawRequested(msg.sender, shares, vaultsArray, reqIds);
+        emit ComposedWithdrawRequested(msg.sender, shares, vaultsArray, reqIds);
     }
 
     /// @dev Pull requested underlying from the vault.
@@ -329,7 +368,7 @@ contract ComposedVault is
             totalWithdrawAmount
         );
 
-        emit Withdrawn(msg.sender, totalWithdrawAmount, _vaults, _reqIds);
+        emit ComposedWithdrawn(msg.sender, totalWithdrawAmount, _vaults, _reqIds);
     }
 
     /// @dev Unit NAV in ONE scale. Pending child redeem shares are excluded via
