@@ -129,7 +129,7 @@ contract sUSD1PlusVault is
     function _authorizeUpgrade(address newImplementation) internal override onlyManager {}
 
     receive() external payable {
-        revert("Not allowed to receive native token");
+        revert("Not allowed native token");
     }
 
     // @dev set underlying token
@@ -168,14 +168,15 @@ contract sUSD1PlusVault is
         override
         returns (uint256 sharesAmount, uint256 unitNav)
     {
-        require(msg.value == 0, "not allowed to deposit native token");
         // transfer the underlying asset to the ceff wallet
         address ceffWallet = _portfolios.at(0);
         IERC20 assetToken = IERC20(underlyingToken);
-        SafeERC20.safeTransferFrom(assetToken, from, ceffWallet, underlyingAmount);
+        // 根据Ceffu要求, 转入Ceffu的from地址需要加白, 所以先将token转到合约, 再转到ceffu
+        SafeERC20.safeTransferFrom(assetToken, from, address(this), underlyingAmount);
+        SafeERC20.safeTransfer(assetToken, ceffWallet, underlyingAmount);
 
         uint256 alignedAmount = alignDepositAmount(underlyingAmount, underlyingToken);
-        require(alignedAmount >= minDepositAmount, "deposit amount too small");
+        require(alignedAmount >= minDepositAmount, "amount too small");
 
         // calculate the shares amount
         unitNav = getUnitNav(settlementPeriod);
