@@ -5,14 +5,7 @@ dotenv.config();
 
 const accounts =
   process.env.PK !== undefined ? [process.env.PK] :
-    [
-      // all belowing private keys are build in accounts in hardhat,
-      "***REMOVED***", // 0x11e07aed82f1210ddab32fcd9419f56162b2794f
-      "***REMOVED***", // 0xe87bde923b1b0b48c2f9f946c386f30d1184458e
-      "***REMOVED***", // 0x761eb5fc4fed1a96a2a2ab6f5be8516c50e3007b
-      "***REMOVED***", // 0xa994a8c305cba5932ec30f1331155035b09bf391
-      "***REMOVED***"  // 0xa3f45b3ab5ff54d24d61c4ea3f39cc98ebcb3c7e
-    ];
+    (process.env.DEFAULT_PKS ?? "").split(",").filter(Boolean);
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -26,9 +19,9 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      bsc: '***REMOVED***',
-      bscTestnet: '***REMOVED***',
-      mainnet: '***REMOVED***'
+      bsc: process.env.BSCSCAN_API_KEY ?? "",
+      bscTestnet: process.env.BSCSCAN_API_KEY ?? "",
+      mainnet: process.env.ETHERSCAN_MAINNET_API_KEY ?? ""
     }
   },
   networks: {
@@ -37,8 +30,7 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true
     },
     eth: {
-      // url: "https://patient-alien-glitter.quiknode.pro/***REMOVED***/",
-      url: "https://mainnet.infura.io/v3/***REMOVED***",
+      url: process.env.ETH_INFURA_URL ?? "",
       accounts: [process.env.ETH_MAINNET_KEY!],
     },
     node: {
@@ -77,7 +69,6 @@ const config: HardhatUserConfig = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     bsctest: {
-      // url: 'https://methodical-ancient-road.bsc-testnet.quiknode.pro/***REMOVED***/',
       url: 'https://bsc-testnet.public.blastapi.io',
       accounts: [process.env.BSC_TESTNET_KEY!]
     },
@@ -87,7 +78,7 @@ const config: HardhatUserConfig = {
     },
     base: {
       // url: "https://mainnet.base.org",
-      url: "https://twilight-thrumming-diamond.base-mainnet.quiknode.pro/***REMOVED***",
+      url: process.env.BASE_MAINNET_URL ?? "",
       accounts
     },
     basetest: {

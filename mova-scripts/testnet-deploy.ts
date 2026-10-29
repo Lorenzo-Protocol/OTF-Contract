@@ -1,8 +1,7 @@
 import { ethers } from "hardhat";
 /**
  {
-      "address": "0x7442Fd66DD90629130f585d28B5C6Daf81EE595e",
-      "privateKey": "***REMOVED***"
+      "address": "0x7442Fd66DD90629130f585d28B5C6Daf81EE595e"
     }
  */
 
